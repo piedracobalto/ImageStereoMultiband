@@ -4,6 +4,27 @@
               useAppConfig="0" addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1">
   <MAINGROUP id="wdTrkB" name="ImageStereoMultiband">
     <GROUP id="{5C41F0AD-7972-4684-739A-8E549073A363}" name="Source">
+      <GROUP id="{8A33EDC4-2C7F-EF33-947A-B4681F6B99BD}" name="Parameters">
+        <FILE id="PNQhZm" name="ParameterIDs.h" compile="0" resource="0" file="Source/Parameters/ParameterIDs.h"/>
+        <FILE id="PJ5BfN" name="ParameterLayout.cpp" compile="1" resource="0"
+              file="Source/Parameters/ParameterLayout.cpp"/>
+        <FILE id="Pwta73" name="ParameterLayout.h" compile="0" resource="0"
+              file="Source/Parameters/ParameterLayout.h"/>
+      </GROUP>
+      <GROUP id="{FFDFD86E-9C9A-2328-BDC9-96347DF1049D}" name="DSP">
+        <GROUP id="{EDD62B46-96F8-8E3A-F5BC-69B2832EA11A}" name="Band">
+          <FILE id="LQ13rx" name="Band.cpp" compile="1" resource="0" file="Source/DSP/Band/Band.cpp"/>
+          <FILE id="nq76xG" name="Band.h" compile="0" resource="0" file="Source/DSP/Band/Band.h"/>
+        </GROUP>
+        <GROUP id="{A0438969-F69A-A1CB-085A-255ECE7B0395}" name="MidSide">
+          <FILE id="HXoCmQ" name="MidSide.cpp" compile="1" resource="0" file="Source/DSP/Midside/MidSide.cpp"/>
+          <FILE id="sf5sLG" name="MidSide.h" compile="0" resource="0" file="Source/DSP/Midside/MidSide.h"/>
+        </GROUP>
+        <GROUP id="{B0F99AFD-C810-3809-A68F-40B70833DBD2}" name="CrossOver">
+          <FILE id="BZe24B" name="Crossover.cpp" compile="1" resource="0" file="Source/DSP/Crossover/Crossover.cpp"/>
+          <FILE id="c5pzTK" name="Crossover.h" compile="0" resource="0" file="Source/DSP/Crossover/Crossover.h"/>
+        </GROUP>
+      </GROUP>
       <FILE id="k98Ngl" name="PluginProcessor.cpp" compile="1" resource="0"
             file="Source/PluginProcessor.cpp"/>
       <FILE id="nT1sFa" name="PluginProcessor.h" compile="0" resource="0"
@@ -25,6 +46,7 @@
     <MODULE id="juce_audio_utils" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_core" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_data_structures" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
+    <MODULE id="juce_dsp" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_events" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_graphics" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
     <MODULE id="juce_gui_basics" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
@@ -52,6 +74,7 @@
         <MODULEPATH id="juce_graphics" path="../../juce-8.0.12-windows/JUCE/modules"/>
         <MODULEPATH id="juce_gui_basics" path="../../juce-8.0.12-windows/JUCE/modules"/>
         <MODULEPATH id="juce_gui_extra" path="../../juce-8.0.12-windows/JUCE/modules"/>
+        <MODULEPATH id="juce_dsp" path="../../juce-8.0.12-windows/JUCE/modules"/>
       </MODULEPATHS>
     </VS2026>
   </EXPORTFORMATS>

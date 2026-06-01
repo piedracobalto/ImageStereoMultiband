@@ -9,6 +9,9 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include "DSP/Midside/MidSide.h"
+#include "DSP/Band/Band.h"
+#include "DSP/Crossover/Crossover.h"
 
 //==============================================================================
 /**
@@ -63,6 +66,7 @@ public:
     juce::AudioProcessorValueTreeState::ParameterLayout createParameters();
 
 private:
+    static constexpr int numBands = 2;
 
 
     //undoManager es una clase de Juce que permite deshacer y rehacer cambios en los parámetros del plugin.
@@ -70,6 +74,17 @@ private:
 
     //AudioProcessorValueTreeState es una clase de Juce que maneja datos y estado del audioProcessor y contiene los parametros utilizados por el plugin
     juce::AudioProcessorValueTreeState apvts;
+    
+	void updateParameters();
+    bool hasAnySolo() const;
+    void applySoloLogic();
+
+    Crossover crossover;
+
+    juce::AudioBuffer<float> lowBandBuffer;
+    juce::AudioBuffer<float> highBandBuffer;
+
+    std::array<Band, numBands> bands;
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ImageStereoMultibandAudioProcessor)
 };

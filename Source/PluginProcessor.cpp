@@ -8,7 +8,7 @@
 
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
-
+#include "DSP/Midside/MidSide.h"
 //==============================================================================
 ImageStereoMultibandAudioProcessor::ImageStereoMultibandAudioProcessor()
 #ifndef JucePlugin_PreferredChannelConfigurations
@@ -37,16 +37,49 @@ ImageStereoMultibandAudioProcessor::~ImageStereoMultibandAudioProcessor()
 // aca van a usarse los parametros que se van a usar en el plugin, por ejemplo gain, cutoff, etc
 juce::AudioProcessorValueTreeState::ParameterLayout ImageStereoMultibandAudioProcessor::createParameters() {
 	//listado de parametros que se van a usar en el plugin
-    juce::AudioProcessorValueTreeState::ParameterLayout parameters;
-	// Agregar los parámetros que desees aquí, por ejemplo:
-	// aca se agrega un parametro de tipo float  con el parametro ID "gain" que hace unico la manera de identificarlo, 
-    // nombre "Gain", 
-    // rango de 0.0 a 1.0 
-    // y valor por defecto de 0.5
+    std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
 
-	parameters.add(std::make_unique<juce::AudioParameterFloat>(juce::ParameterID("gain", 1), "Gain", 0.0f, 1.0f, 0.5f));
+    for (int i = 1; i <= numBands; ++i)
+    {
+        params.push_back(
+            std::make_unique<juce::AudioParameterFloat>(
+                "band" + juce::String(i) + "Width",
+                "Band " + juce::String(i) + " Width",
+                0.0f,
+                2.0f,
+                1.0f));
 
-    return parameters;
+        params.push_back(
+            std::make_unique<juce::AudioParameterFloat>(
+                "band" + juce::String(i) + "Gain",
+                "Band " + juce::String(i) + " Gain",
+                -24.0f,
+                24.0f,
+                0.0f));
+
+        params.push_back(
+            std::make_unique<juce::AudioParameterBool>(
+                "band" + juce::String(i) + "Mute",
+                "Band " + juce::String(i) + " Mute",
+                false));
+
+        params.push_back(
+            std::make_unique<juce::AudioParameterBool>(
+                "band" + juce::String(i) + "Solo",
+                "Band " + juce::String(i) + " Solo",
+                false));
+    }
+
+    params.push_back(
+        std::make_unique<juce::AudioParameterFloat>(
+            "crossoverFreq",
+            "Crossover Frequency",
+            20.0f,
+            20000.0f,
+            1000.0f));
+
+
+    return { params.begin(), params.end() };
 }
 
 //==============================================================================
@@ -116,6 +149,29 @@ void ImageStereoMultibandAudioProcessor::prepareToPlay (double sampleRate, int s
 {
     // Use this method as the place to do any pre-playback
     // initialisation that you need..
+	//spec es un objeto de tipo juce::dsp::ProcessSpec se utiliza para configurar las especificaciones de procesamiento de audio, como la frecuencia de muestreo, el tamaño del bloque y el número de canales.
+        juce::dsp::ProcessSpec spec;
+		spec.maximumBlockSize = samplesPerBlock;
+		spec.sampleRate = sampleRate;
+		spec.numChannels = getTotalNumOutputChannels();
+
+		// band.prepare(spec) es un método que se llama para preparar cada banda de procesamiento de audio con las especificaciones definidas en el objeto spec.
+		// contiene midside.prepare(spec) que prepara el procesamiento mid-side con las especificaciones definidas en spec.
+        for (auto& band : bands)
+        {
+            band.prepare(spec);
+        }
+
+        crossover.prepare(spec);
+
+        lowBandBuffer.setSize(
+            getTotalNumOutputChannels(),
+            samplesPerBlock);
+
+        highBandBuffer.setSize(
+            getTotalNumOutputChannels(),
+            samplesPerBlock);
+        
 }
 
 void ImageStereoMultibandAudioProcessor::releaseResources()
@@ -155,30 +211,88 @@ bool ImageStereoMultibandAudioProcessor::isBusesLayoutSupported (const BusesLayo
 void ImageStereoMultibandAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
     juce::ScopedNoDenormals noDenormals;
-    auto totalNumInputChannels  = getTotalNumInputChannels();
-    auto totalNumOutputChannels = getTotalNumOutputChannels();
+	auto totalNumInputChannels = getTotalNumInputChannels();
+	auto totalnumOutputChannels = getTotalNumOutputChannels();
 
-    // In case we have more outputs than inputs, this code clears any output
-    // channels that didn't contain input data, (because these aren't
-    // guaranteed to be empty - they may contain garbage).
-    // This is here to avoid people getting screaming feedback
-    // when they first compile a plugin, but obviously you don't need to keep
-    // this code if your algorithm always overwrites all the output channels.
-    for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
-        buffer.clear (i, 0, buffer.getNumSamples());
+    updateParameters();
 
-    // This is the place where you'd normally do the guts of your plugin's
-    // audio processing...
-    // Make sure to reset the state if your inner loop is processing
-    // the samples and the outer loop is handling the channels.
-    // Alternatively, you can process the samples with the channels
-    // interleaved by keeping the same state.
-    for (int channel = 0; channel < totalNumInputChannels; ++channel)
+    crossover.process(
+        buffer,
+        lowBandBuffer,
+        highBandBuffer);
+
+
+    bands[0].process(lowBandBuffer);
+    bands[1].process(highBandBuffer);
+
+    applySoloLogic();
+
+    buffer.makeCopyOf(lowBandBuffer);
+
+    for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
     {
-        auto* channelData = buffer.getWritePointer (channel);
-
-        // ..do something to the data...
+        buffer.addFrom(
+            ch,
+            0,
+            highBandBuffer,
+            ch,
+            0,
+            buffer.getNumSamples());
     }
+}
+
+
+void ImageStereoMultibandAudioProcessor::updateParameters()
+{
+    for (int i = 0; i < numBands; ++i)
+    {
+        auto bandId = juce::String(i + 1);
+
+        bands[i].setWidth(
+            apvts.getRawParameterValue(
+                "band" + bandId + "Width")->load());
+
+        bands[i].setGain(
+            apvts.getRawParameterValue(
+                "band" + bandId + "Gain")->load());
+
+
+		// el valor 0.5f se utiliza como umbral para determinar si el parámetro de silencio (Mute) está activado o desactivado.
+        bands[i].setMute(
+            apvts.getRawParameterValue(
+                "band" + bandId + "Mute")->load() > 0.5f);
+
+        bands[i].setSolo(
+            apvts.getRawParameterValue(
+                "band" + bandId + "Solo")->load() > 0.5f);
+    }
+
+    crossover.setFrequency(
+        apvts.getRawParameterValue(
+            "crossoverFreq")->load());
+}
+
+bool ImageStereoMultibandAudioProcessor::hasAnySolo() const
+{
+    for (const auto& band : bands)
+    {
+        if (band.isSolo())
+            return true;
+    }
+
+    return false;
+}
+
+void ImageStereoMultibandAudioProcessor::applySoloLogic()
+{
+    if (!hasAnySolo())
+        return;
+
+    if (!bands[0].isSolo())
+        lowBandBuffer.clear();
+
+    if (!bands[1].isSolo())
+        highBandBuffer.clear();
 }
 
 //==============================================================================
@@ -189,10 +303,10 @@ bool ImageStereoMultibandAudioProcessor::hasEditor() const
 
 juce::AudioProcessorEditor* ImageStereoMultibandAudioProcessor::createEditor()
 {
-    return new ImageStereoMultibandAudioProcessorEditor (*this);
+    //return new ImageStereoMultibandAudioProcessorEditor (*this);
 
 	//cuando no se tiene un editor personalizado, se puede usar el editor generico de JUCE
-	//return new juce::GenericAudioProcessorEditor(*this); // Use the generic editor
+	return new juce::GenericAudioProcessorEditor(*this); // Use the generic editor
 }
 
 //==============================================================================
