@@ -27,6 +27,7 @@ public:
 private:
 
     float crossoverFrequency = 1000.0f;
+    juce::SmoothedValue<float> frequencySmoothed;
 
     juce::dsp::LinkwitzRileyFilter<float> lowLeft;
     juce::dsp::LinkwitzRileyFilter<float> lowRight;

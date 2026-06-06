@@ -12,6 +12,16 @@
               file="Source/Parameters/ParameterLayout.h"/>
       </GROUP>
       <GROUP id="{FFDFD86E-9C9A-2328-BDC9-96347DF1049D}" name="DSP">
+        <GROUP id="{0F742C29-F670-D4B3-999A-92F76B7EA727}" name="MultibandSplitter">
+          <FILE id="UvEnUh" name="MultibandSplitter.cpp" compile="1" resource="0"
+                file="Source/DSP/MultibandSplitter/MultibandSplitter.cpp"/>
+          <FILE id="uDLl2o" name="MultibandSplitter.h" compile="0" resource="0"
+                file="Source/DSP/MultibandSplitter/MultibandSplitter.h"/>
+        </GROUP>
+        <GROUP id="{D023817D-BC29-7205-E638-396F3E941AD0}" name="Gain">
+          <FILE id="KcmGPM" name="Gain.cpp" compile="1" resource="0" file="Source/DSP/Gain/Gain.cpp"/>
+          <FILE id="OUvZhY" name="Gain.h" compile="0" resource="0" file="Source/DSP/Gain/Gain.h"/>
+        </GROUP>
         <GROUP id="{EDD62B46-96F8-8E3A-F5BC-69B2832EA11A}" name="Band">
           <FILE id="LQ13rx" name="Band.cpp" compile="1" resource="0" file="Source/DSP/Band/Band.cpp"/>
           <FILE id="nq76xG" name="Band.h" compile="0" resource="0" file="Source/DSP/Band/Band.h"/>

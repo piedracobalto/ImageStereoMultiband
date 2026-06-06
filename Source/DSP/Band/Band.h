@@ -26,10 +26,14 @@ public:
     void setMute(bool shouldMute);
     void setSolo(bool shouldSolo);
     bool isSolo() const;
+    bool isMuted() const;
+
+    void setLevelTarget(float gain);
 
 private:
     Midside midSide;
-    float gainLinear = 1.0f;
+    juce::SmoothedValue<float> bandGain;
+    juce::SmoothedValue<float> levelGain;
     bool muted = false;
     bool solo = false;
 };

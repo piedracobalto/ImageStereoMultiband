@@ -32,18 +32,16 @@ void Crossover::prepare(const juce::dsp::ProcessSpec& spec)
     highRight.setType(
         juce::dsp::LinkwitzRileyFilterType::highpass);
 
+    frequencySmoothed.reset(spec.sampleRate, 0.05); // 50 ms
+    frequencySmoothed.setCurrentAndTargetValue(crossoverFrequency);
+
     setFrequency(crossoverFrequency);
 }
 
 void Crossover::setFrequency(float frequency)
 {
     crossoverFrequency = frequency;
-
-    lowLeft.setCutoffFrequency(frequency);
-    lowRight.setCutoffFrequency(frequency);
-
-    highLeft.setCutoffFrequency(frequency);
-    highRight.setCutoffFrequency(frequency);
+    frequencySmoothed.setTargetValue(frequency);
 }
 
 void Crossover::process(
@@ -56,34 +54,10 @@ void Crossover::process(
 
     auto numSamples = input.getNumSamples();
 
-    for (int sample = 0; sample < numSamples; ++sample)
-    {
-        lowBand.setSample(
-            0,
-            sample,
-            lowLeft.processSample(
-                0,
-                lowBand.getSample(0, sample)));
+    auto cutoff = frequencySmoothed.getNextValue();
 
-        lowBand.setSample(
-            1,
-            sample,
-            lowRight.processSample(
-                1,
-                lowBand.getSample(1, sample)));
-
-        highBand.setSample(
-            0,
-            sample,
-            highLeft.processSample(
-                0,
-                highBand.getSample(0, sample)));
-
-        highBand.setSample(
-            1,
-            sample,
-            highRight.processSample(
-                1,
-                highBand.getSample(1, sample)));
-    }
+    lowLeft.setCutoffFrequency(cutoff);
+    lowRight.setCutoffFrequency(cutoff);
+    highLeft.setCutoffFrequency(cutoff);
+    highRight.setCutoffFrequency(cutoff);
 }

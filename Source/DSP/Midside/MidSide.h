@@ -26,4 +26,7 @@ private:
 	double sampleRate{ 44100.0 };
 	float midGain  = 1.0f;
     float sideGain = 1.0f;
+    float smoothMid = 0.0f;
+    float smoothSide = 0.0f;
+
 };

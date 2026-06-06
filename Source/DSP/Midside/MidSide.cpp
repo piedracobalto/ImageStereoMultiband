@@ -26,11 +26,11 @@ void Midside::process(juce::AudioBuffer<float>& buffer)
         auto left  = buffer.getSample(0, sample);
         auto right = buffer.getSample(1, sample);
 
-        auto mid  = (left + right) / std::sqrt(2.0f);
-        auto side = (left - right) / std::sqrt(2.0f);
+        smoothMid = smoothMid - (0.002f * (smoothMid - midGain));
+        smoothSide = smoothSide - (0.002f * (smoothSide - sideGain));
 
-        mid *= midGain;
-        side *= sideGain;
+        auto mid  = (left + right) * smoothMid / std::sqrt(2.0f);
+        auto side = (left - right) * smoothSide / std::sqrt(2.0f);
 
         auto newLeft  = (mid + side) / std::sqrt(2.0f);
         auto newRight = (mid - side) / std::sqrt(2.0f);
