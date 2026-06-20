@@ -11,15 +11,16 @@
 #include <JuceHeader.h>
 #include "PluginProcessor.h"
 #include "GUI/Components/BandStrip.h"
-#include "GUI/Components/CrossoverControls.h"
 #include "GUI/Components/HeaderBar.h"
-#include "GUI/Components/StereoFieldMeter.h"
+#include "GUI/Components/Vectorscope.h"
+#include "GUI/Components/SpectrumCrossoverControls.h"
 #include "GUI/LookAndFeel/PluginLookAndFeel.h"
 
 //==============================================================================
 /**
 */
-class ImageStereoMultibandAudioProcessorEditor  : public juce::AudioProcessorEditor
+class ImageStereoMultibandAudioProcessorEditor  : public juce::AudioProcessorEditor,
+                                                  private juce::Timer
 {
 public:
     ImageStereoMultibandAudioProcessorEditor (ImageStereoMultibandAudioProcessor&);
@@ -30,14 +31,14 @@ public:
     void resized() override;
 
 private:
-    // This reference is provided as a quick way for your editor to
-    // access the processor object that created it.
+    void timerCallback() override;
+
     ImageStereoMultibandAudioProcessor& audioProcessor;
 
     PluginLookAndFeel lookAndFeel;
     HeaderBar headerBar;
-    CrossoverControls crossoverControls;
-    StereoFieldMeter stereoFieldMeter;
+    Vectorscope vectorscope;
+    SpectrumCrossoverControls spectrumCrossoverControls;
     std::array<std::unique_ptr<BandStrip>, 5> bandStrips;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ImageStereoMultibandAudioProcessorEditor)

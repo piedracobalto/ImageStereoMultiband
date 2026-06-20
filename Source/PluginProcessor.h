@@ -11,6 +11,7 @@
 #include <JuceHeader.h>
 #include "DSP/Band/Band.h"
 #include "DSP/MultibandSplitter/MultibandSplitter.h"
+#include "DSP/Analyzer/AudioAnalyzer.h"
 
 
 
@@ -67,6 +68,12 @@ public:
     juce::AudioProcessorValueTreeState::ParameterLayout createParameters();
     juce::AudioProcessorValueTreeState& getAPVTS();
 
+    AudioAnalyzer& getAnalyzer() { return analyzer; }
+    const std::array<float, 4>& getCrossovers() const { return currentCrossovers; }
+    double getCurrentSampleRate() const { return currentSampleRate; }
+    bool isBandMuted(int index) const { return index >= 0 && index < numBands ? bands[index].isMuted() : false; }
+    bool isBandSoloed(int index) const { return index >= 0 && index < numBands ? bands[index].isSolo() : false; }
+
 private:
     static constexpr int numBands = 5;
 
@@ -100,6 +107,9 @@ private:
         2000.0f,
         8000.0f
     };
+
+    AudioAnalyzer analyzer;
+    double currentSampleRate = 44100.0;
 
     //==========================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ImageStereoMultibandAudioProcessor)

@@ -188,7 +188,8 @@ void ImageStereoMultibandAudioProcessor::prepareToPlay(
             samplesPerBlock);
     }
 
-  
+    analyzer.prepare(sampleRate, samplesPerBlock);
+    currentSampleRate = sampleRate;
 
     bypassMix.reset(sampleRate, 0.05); // 50 ms
     bypassMix.setCurrentAndTargetValue(1.0f);
@@ -274,6 +275,9 @@ void ImageStereoMultibandAudioProcessor::processBlock(
                 buffer.getNumSamples());
         }
     }
+
+    // Analizar audio post-procesamiento (antes del bypass para reflejar Width/Gain)
+    analyzer.process(buffer);
 
     // Crossfade bypass smooth
     for (int sample = 0; sample < buffer.getNumSamples(); ++sample)
