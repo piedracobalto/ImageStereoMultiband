@@ -65,6 +65,7 @@ public:
     //ParameterLayout es una clase de Juce que contiene un conjunto de RangedAudioParameters y AudioProcessorParameterGroups que contienen RangedAudioParameters. 
     // Esta clase se utiliza en el constructor de AudioProcessorValueTreeState para permitir que se pasen arbitrariamente agrupados RangedAudioParameters a un AudioProcessor.
     juce::AudioProcessorValueTreeState::ParameterLayout createParameters();
+    juce::AudioProcessorValueTreeState& getAPVTS();
 
 private:
     static constexpr int numBands = 5;

@@ -35,6 +35,34 @@
           <FILE id="c5pzTK" name="Crossover.h" compile="0" resource="0" file="Source/DSP/Crossover/Crossover.h"/>
         </GROUP>
       </GROUP>
+      <GROUP id="{60B47FB2-BC72-4DC2-A219-49F884715CA4}" name="GUI">
+        <GROUP id="{7B817634-95D3-465C-8C23-5F955C3E8E86}" name="Components">
+          <FILE id="IMB001" name="BandStrip.cpp" compile="1" resource="0"
+                file="Source/GUI/Components/BandStrip.cpp"/>
+          <FILE id="IMB002" name="BandStrip.h" compile="0" resource="0"
+                file="Source/GUI/Components/BandStrip.h"/>
+          <FILE id="IMB003" name="CrossoverControls.cpp" compile="1" resource="0"
+                file="Source/GUI/Components/CrossoverControls.cpp"/>
+          <FILE id="IMB004" name="CrossoverControls.h" compile="0" resource="0"
+                file="Source/GUI/Components/CrossoverControls.h"/>
+          <FILE id="IMB005" name="HeaderBar.cpp" compile="1" resource="0"
+                file="Source/GUI/Components/HeaderBar.cpp"/>
+          <FILE id="IMB006" name="HeaderBar.h" compile="0" resource="0"
+                file="Source/GUI/Components/HeaderBar.h"/>
+          <FILE id="IMB009" name="StereoFieldMeter.cpp" compile="1" resource="0"
+                file="Source/GUI/Components/StereoFieldMeter.cpp"/>
+          <FILE id="IMB010" name="StereoFieldMeter.h" compile="0" resource="0"
+                file="Source/GUI/Components/StereoFieldMeter.h"/>
+        </GROUP>
+        <GROUP id="{0E21CA40-EB0C-4A4C-B5E1-2564E35F31F8}" name="LookAndFeel">
+          <FILE id="IMB007" name="PluginLookAndFeel.cpp" compile="1" resource="0"
+                file="Source/GUI/LookAndFeel/PluginLookAndFeel.cpp"/>
+          <FILE id="IMB008" name="PluginLookAndFeel.h" compile="0" resource="0"
+                file="Source/GUI/LookAndFeel/PluginLookAndFeel.h"/>
+        </GROUP>
+        <FILE id="IMB011" name="BandColours.h" compile="0" resource="0"
+              file="Source/GUI/BandColours.h"/>
+      </GROUP>
       <FILE id="k98Ngl" name="PluginProcessor.cpp" compile="1" resource="0"
             file="Source/PluginProcessor.cpp"/>
       <FILE id="nT1sFa" name="PluginProcessor.h" compile="0" resource="0"

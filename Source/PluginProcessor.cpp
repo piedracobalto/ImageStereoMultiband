@@ -400,7 +400,7 @@ bool ImageStereoMultibandAudioProcessor::hasEditor() const
 juce::AudioProcessorEditor*
 ImageStereoMultibandAudioProcessor::createEditor()
 {
-    return new juce::GenericAudioProcessorEditor(*this);
+    return new ImageStereoMultibandAudioProcessorEditor(*this);
 }
 
 //==============================================================================
@@ -439,6 +439,11 @@ void ImageStereoMultibandAudioProcessor::setStateInformation(
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 {
     return new ImageStereoMultibandAudioProcessor();
+}
+
+juce::AudioProcessorValueTreeState& ImageStereoMultibandAudioProcessor::getAPVTS()
+{
+    return apvts;
 }
 
 void ImageStereoMultibandAudioProcessor::setBypassed(bool shouldBypass)
