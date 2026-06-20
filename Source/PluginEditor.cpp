@@ -57,16 +57,17 @@ void ImageStereoMultibandAudioProcessorEditor::resized()
 
     content.removeFromTop(6);
 
-    // Middle: Vectorscope
-    vectorscope.setBounds(content.removeFromTop(180).reduced(2, 2));
+    // Bottom row: band strips (left) + Vectorscope square (right)
+    auto bottomRow = content;
 
-    content.removeFromTop(8);
+    const auto vecSize = juce::jmin(bottomRow.getHeight() - 4, bottomRow.getWidth() / 3 - 4);
+    auto vecArea = bottomRow.removeFromRight(vecSize).reduced(2, 2);
+    vectorscope.setBounds(vecArea);
 
-    // Bottom: band strips
-    const auto stripWidth = content.getWidth() / static_cast<int>(bandStrips.size());
+    const auto stripWidth = bottomRow.getWidth() / static_cast<int>(bandStrips.size());
 
     for (auto& bandStrip : bandStrips)
-        bandStrip->setBounds(content.removeFromLeft(stripWidth).reduced(3, 0));
+        bandStrip->setBounds(bottomRow.removeFromLeft(stripWidth).reduced(3, 0));
 }
 
 void ImageStereoMultibandAudioProcessorEditor::timerCallback()

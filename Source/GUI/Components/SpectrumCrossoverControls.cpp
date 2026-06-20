@@ -120,61 +120,40 @@ void SpectrumCrossoverControls::paint(juce::Graphics& g)
         g.drawLine(x, graph.getY(), x, graph.getBottom(), 0.5f);
     }
 
-    // ---- Spectrum curve (0-20Hz flattened) ----
+    // ---- Spectrum curve ----
     if (numBins > 0)
     {
         juce::Path spectrumPath;
-        int firstBinIdx = 0;
-        int flattenCount = 0;
+        bool started = false;
 
         for (int i = 0; i < numBins; ++i)
         {
-            auto binFreq = static_cast<float>(i) * maxSpectrumFreq / static_cast<float>(numBins);
-            if (binFreq >= minFrequency)
-            {
-                firstBinIdx = i;
-                break;
-            }
-        }
+            const auto binFreq =
+                static_cast<float>(i) * maxSpectrumFreq /
+                static_cast<float>(numBins);
 
-        for (int i = firstBinIdx; i < numBins; ++i)
-        {
-            auto binFreq = static_cast<float>(i) * maxSpectrumFreq / static_cast<float>(numBins);
+            if (binFreq < minFrequency)
+                continue;
+
             if (binFreq > maxFrequency)
                 break;
 
-            if (binFreq < 50.0f)
-                ++flattenCount;
-            else
-                break;
-        }
-        if (flattenCount > 3) flattenCount = 3;
+            const auto x = valueToX(binFreq);
 
-        float flattenDb = -10.0f;
-        for (int i = firstBinIdx; i < firstBinIdx + flattenCount && i < numBins; ++i)
-        {
-            if (spectrum[i] > flattenDb)
-                flattenDb = spectrum[i];
-        }
+            const auto db = juce::jlimit(
+                minDb,
+                maxDb,
+                spectrum[i]);
 
-        for (int i = firstBinIdx; i < numBins; ++i)
-        {
-            auto binFreq = static_cast<float>(i) * maxSpectrumFreq / static_cast<float>(numBins);
-            if (binFreq > maxFrequency)
-                break;
+            const auto y =
+                graph.getY() +
+                graph.getHeight() *
+                (1.0f - (db - minDb) / (maxDb - minDb));
 
-            auto x = valueToX(binFreq);
-            float db = spectrum[i];
-
-            if (i < firstBinIdx + flattenCount && db < flattenDb)
-                db = flattenDb;
-
-            auto y = graph.getY() + graph.getHeight() * (1.0f - (db - minDb) / (maxDb - minDb));
-
-            if (i == firstBinIdx)
+            if (!started)
             {
-                spectrumPath.startNewSubPath(graph.getX(), y);
-                spectrumPath.lineTo(x, y);
+                spectrumPath.startNewSubPath(x, y);
+                started = true;
             }
             else
             {
@@ -182,8 +161,15 @@ void SpectrumCrossoverControls::paint(juce::Graphics& g)
             }
         }
 
-        g.setColour(juce::Colour(0xff58c7d9).withAlpha(0.85f));
-        g.strokePath(spectrumPath, juce::PathStrokeType(1.5f, juce::PathStrokeType::curved));
+        g.setColour(
+            juce::Colour(0xff58c7d9)
+            .withAlpha(0.85f));
+
+        g.strokePath(
+            spectrumPath,
+            juce::PathStrokeType(
+                1.5f,
+                juce::PathStrokeType::curved));
     }
 
     // ---- Crossover lines with handle labels ----
