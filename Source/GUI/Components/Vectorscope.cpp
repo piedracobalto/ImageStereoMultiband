@@ -11,6 +11,8 @@ Vectorscope::Vectorscope()
         btn.setColour(juce::TextButton::textColourOnId, juce::Colours::white);
     };
 
+    setOpaque(true);
+
     addAndMakeVisible(zoomInBtn);
     styleBtn(zoomInBtn);
     zoomInBtn.onClick = [this]
@@ -93,16 +95,22 @@ void Vectorscope::clearScopes()
 
 void Vectorscope::tickSmoothing()
 {
+    auto oldVal = displayCorrelation;
     auto diff = targetCorrelation - displayCorrelation;
     displayCorrelation += diff * 0.12f;
     if (std::abs(diff) < 0.0001f)
         displayCorrelation = targetCorrelation;
-    repaint();
+    if (std::abs(displayCorrelation - oldVal) > 0.0005f)
+        repaint();
 }
 
 void Vectorscope::paint(juce::Graphics& g)
 {
-    auto bounds = getLocalBounds().toFloat().reduced(2.0f);
+    auto fullBounds = getLocalBounds().toFloat();
+    g.setColour(juce::Colour(0xff181c21));
+    g.fillRect(fullBounds);
+
+    auto bounds = fullBounds.reduced(2.0f);
     g.setColour(juce::Colour(0xff20242a));
     g.fillRoundedRectangle(bounds, 8.0f);
 
