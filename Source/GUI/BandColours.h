@@ -10,11 +10,11 @@ namespace BandColours
     {
         static const std::array<juce::Colour, numBands> colours
         {
-            juce::Colour(0xffff3b30), // infrared / lows
-            juce::Colour(0xffff9500),
-            juce::Colour(0xffffd60a),
-            juce::Colour(0xff00c7ff),
-            juce::Colour(0xff9b5cff)  // ultraviolet / highs
+            juce::Colour(0xffee6677), // red/pink
+            juce::Colour(0xff4477aa), // blue
+            juce::Colour(0xff228833), // green
+            juce::Colour(0xffccbb44), // yellow
+            juce::Colour(0xffaa3377)  // purple
         };
 
         return colours[static_cast<size_t>(juce::jlimit(0, numBands - 1, bandIndex))];

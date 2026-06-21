@@ -75,7 +75,23 @@ void ImageStereoMultibandAudioProcessorEditor::timerCallback()
     AudioAnalyzer::Snapshot snap;
     if (audioProcessor.getAnalyzer().consumeSnapshot(snap))
     {
-        vectorscope.pushScopeData(snap.scopeLeft, snap.scopeRight, snap.scopeCount);
+        for (int i = 0; i < 5; ++i)
+        {
+            auto& bs = audioProcessor.getBandScope(i);
+            vectorscope.pushBandScope(i, bs.left.data(), bs.right.data(), bs.count);
+        }
+
+        {
+            double sumL = 0.0, sumR = 0.0, sumLR = 0.0;
+            for (int i = 0; i < snap.scopeCount; ++i)
+            {
+                auto l = static_cast<double>(snap.scopeLeft[i]);
+                auto r = static_cast<double>(snap.scopeRight[i]);
+                sumL += l * l; sumR += r * r; sumLR += l * r;
+            }
+            auto denom = std::sqrt(sumL * sumR);
+            vectorscope.setCorrelation(denom > 1e-12 ? static_cast<float>(sumLR / denom) : 0.0f);
+        }
         vectorscope.repaint();
 
         auto maxFreq = static_cast<float>(audioProcessor.getCurrentSampleRate()) * 0.5f;
@@ -90,5 +106,10 @@ void ImageStereoMultibandAudioProcessorEditor::timerCallback()
         spectrumCrossoverControls.setBandStates(muted, soloed, 5);
 
         spectrumCrossoverControls.repaint();
+    }
+    else
+    {
+        vectorscope.setCorrelation(0.0f);
+        vectorscope.clearScopes();
     }
 }

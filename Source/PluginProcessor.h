@@ -74,6 +74,20 @@ public:
     bool isBandMuted(int index) const { return index >= 0 && index < numBands ? bands[index].isMuted() : false; }
     bool isBandSoloed(int index) const { return index >= 0 && index < numBands ? bands[index].isSolo() : false; }
 
+    struct BandScopeBuffer
+    {
+        static constexpr int size = 512;
+        std::array<float, size> left{};
+        std::array<float, size> right{};
+        int count = 0;
+
+    private:
+        int pos = 0;
+        friend class ImageStereoMultibandAudioProcessor;
+    };
+
+    const BandScopeBuffer& getBandScope(int index) const { return bandScopes[static_cast<size_t>(index)]; }
+
 private:
     static constexpr int numBands = 5;
 
@@ -109,6 +123,7 @@ private:
     };
 
     AudioAnalyzer analyzer;
+    std::array<BandScopeBuffer, numBands> bandScopes;
     double currentSampleRate = 44100.0;
 
     //==========================================================================

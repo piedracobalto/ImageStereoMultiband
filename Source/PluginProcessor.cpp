@@ -260,6 +260,23 @@ void ImageStereoMultibandAudioProcessor::processBlock(
 
     applySoloLogic();
 
+    for (int b = 0; b < numBands; ++b)
+    {
+        auto& buf = bandScopes[static_cast<size_t>(b)];
+        auto& bandBuf = bandBuffers[static_cast<size_t>(b)];
+        auto numSamples = bandBuf.getNumSamples();
+        auto* l = bandBuf.getReadPointer(0);
+        auto* r = bandBuf.getReadPointer(1);
+        for (int s = 0; s < numSamples; ++s)
+        {
+            buf.left[static_cast<size_t>(buf.pos)] = l[s];
+            buf.right[static_cast<size_t>(buf.pos)] = r[s];
+            buf.pos = (buf.pos + 1) % BandScopeBuffer::size;
+            if (buf.count < BandScopeBuffer::size)
+                ++buf.count;
+        }
+    }
+
     buffer.clear();
 
     for (int band = 0; band < numBands; ++band)
