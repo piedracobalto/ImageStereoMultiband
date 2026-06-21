@@ -11,7 +11,9 @@ public:
 
     void pushScopeData(const float* left, const float* right, int count);
     void pushBandScope(int bandIndex, const float* left, const float* right, int count);
-    void setCorrelation(float corr) { correlation = corr; repaint(); }
+    void setCorrelation(float corr) { targetCorrelation = corr; }
+    void setHasSignal(bool s) { hasSignal = s; }
+    void tickSmoothing();
     void clearScopes();
 
     void paint(juce::Graphics& g) override;
@@ -39,5 +41,7 @@ private:
     juce::TextButton zoomOutBtn;
     juce::TextButton colorBtn;
 
-    float correlation = 0.0f;
+    float targetCorrelation = 0.0f;
+    float displayCorrelation = 0.0f;
+    bool hasSignal = false;
 };

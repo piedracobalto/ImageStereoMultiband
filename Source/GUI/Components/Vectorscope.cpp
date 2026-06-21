@@ -72,12 +72,13 @@ void Vectorscope::pushBandScope(int bandIndex, const float* left, const float* r
         bs.side[i] = (l - r) * 0.5f;
     }
 
+    hasSignal = true;
+
     int maxCount = 0;
     for (auto& b : bandScopes)
         if (b.count > maxCount)
             maxCount = b.count;
     anyScopeCount = maxCount;
-
 }
 
 void Vectorscope::clearScopes()
@@ -85,6 +86,17 @@ void Vectorscope::clearScopes()
     anyScopeCount = 0;
     for (auto& bs : bandScopes)
         bs.count = 0;
+    hasSignal = false;
+    targetCorrelation = 0.0f;
+    repaint();
+}
+
+void Vectorscope::tickSmoothing()
+{
+    auto diff = targetCorrelation - displayCorrelation;
+    displayCorrelation += diff * 0.12f;
+    if (std::abs(diff) < 0.0001f)
+        displayCorrelation = targetCorrelation;
     repaint();
 }
 
@@ -114,9 +126,12 @@ void Vectorscope::paint(juce::Graphics& g)
 
     auto scope = area.reduced(4, 6).toFloat();
     auto meterHeight = 16.0f;
-    auto scopeBox = scope.withTrimmedBottom(meterHeight + 4.0f);
+    auto tickHeight = 12.0f;
+    auto scopeBox = scope.withTrimmedBottom(meterHeight + tickHeight + 6.0f);
     auto meterBox = juce::Rectangle<float>(scope.getX(), scopeBox.getBottom() + 4,
                                            scope.getWidth(), meterHeight);
+    auto tickBox = juce::Rectangle<float>(scope.getX(), meterBox.getBottom() + 2,
+                                          scope.getWidth(), tickHeight);
 
     auto size = juce::jmin(scopeBox.getWidth(), scopeBox.getHeight()) * 0.45f;
     auto cx = scopeBox.getCentreX();
@@ -188,44 +203,68 @@ void Vectorscope::paint(juce::Graphics& g)
     g.setColour(juce::Colour(0xff14181d));
     g.fillRoundedRectangle(meterBox, 4.0f);
 
-    auto meterCenter = meterBox.getCentreX();
-    auto meterHalf = meterBox.getWidth() * 0.5f;
     auto meterY = meterBox.getY();
     auto meterH = meterBox.getHeight();
+    float meterLeft = meterBox.getX();
 
     // Background bar
     g.setColour(juce::Colour(0xff252a31));
     g.fillRoundedRectangle(meterBox.reduced(0, 2), 2.0f);
 
-    // Correlation fill
-    auto fillW = (correlation + 1.0f) * 0.5f * meterBox.getWidth();
-    auto fillRect = juce::Rectangle<float>(meterBox.getX(), meterY + 2,
-                                           fillW, meterH - 4);
-    auto corrColour = (correlation > 0.7f) ? juce::Colour(0xff4cd964) :
-                      (correlation > 0.3f) ? juce::Colour(0xffffd60a) :
-                      (correlation > -0.3f) ? juce::Colour(0xffff9500) :
-                      juce::Colour(0xffff3b30);
-    g.setColour(corrColour);
-    g.fillRoundedRectangle(fillRect, 2.0f);
+    // Tick marks at -1, -0.5, 0, 0.5, 1
+    auto tickTop = meterY + 2;
+    auto tickBot = meterBox.getBottom() - 2;
+    g.setColour(juce::Colour(0xff555555));
+    for (float t = -1.0f; t <= 1.0f; t += 0.5f)
+    {
+        auto x = meterLeft + (t + 1.0f) * 0.5f * meterBox.getWidth();
+        g.drawVerticalLine(static_cast<int>(x), tickTop, tickBot);
+    }
 
-    // Center marker
-    g.setColour(juce::Colour(0xff6f7b87));
-    g.drawVerticalLine(static_cast<int>(meterCenter), meterY + 2, meterY + meterH - 2);
+    // Correlation fill (only if signal present)
+    if (hasSignal && std::abs(displayCorrelation) > 0.001f)
+    {
+        auto fillW = (displayCorrelation + 1.0f) * 0.5f * meterBox.getWidth();
+        auto fillRect = juce::Rectangle<float>(meterLeft, tickTop, fillW, tickBot - tickTop);
+        auto c = displayCorrelation;
+        auto corrColour = (c > 0.7f) ? juce::Colour(0xff4cd964) :
+                          (c > 0.3f) ? juce::Colour(0xffffd60a) :
+                          (c > -0.3f) ? juce::Colour(0xffff9500) :
+                          (c > -0.7f) ? juce::Colour(0xffff3b30) :
+                          juce::Colour(0xffcc0000);
+        g.setColour(corrColour);
+        g.fillRoundedRectangle(fillRect, 2.0f);
+    }
 
     // Correlation text
     g.setFont(juce::FontOptions(10.0f));
-    g.drawFittedText(juce::String(correlation, 2),
-                     static_cast<int>(meterBox.getX()),
-                     static_cast<int>(meterY),
-                     static_cast<int>(meterBox.getWidth()),
-                     static_cast<int>(meterH),
-                     juce::Justification::centred, 1);
+    g.setColour(juce::Colour(0xff6f7b87));
+    if (hasSignal)
+        g.drawFittedText(juce::String(displayCorrelation, 2),
+                         static_cast<int>(meterBox.getX()),
+                         static_cast<int>(meterY),
+                         static_cast<int>(meterBox.getWidth()),
+                         static_cast<int>(meterH),
+                         juce::Justification::centred, 1);
+    else
+        g.drawFittedText("---",
+                         static_cast<int>(meterBox.getX()),
+                         static_cast<int>(meterY),
+                         static_cast<int>(meterBox.getWidth()),
+                         static_cast<int>(meterH),
+                         juce::Justification::centred, 1);
 
-    // Phase label
-    g.setFont(juce::FontOptions(9.0f));
-    g.drawFittedText("Phase", static_cast<int>(scopeBox.getX()),
-                     static_cast<int>(meterBox.getBottom() + 2),
-                     40, 12, juce::Justification::centredLeft, 1);
+    // Tick labels
+    g.setFont(juce::FontOptions(8.0f));
+    g.setColour(juce::Colour(0xff6f7b87));
+    for (float t = -1.0f; t <= 1.0f; t += 0.5f)
+    {
+        auto x = meterLeft + (t + 1.0f) * 0.5f * meterBox.getWidth();
+        g.drawFittedText(juce::String(t, 1),
+                         static_cast<int>(x) - 14, static_cast<int>(tickBox.getY()),
+                         28, static_cast<int>(tickBox.getHeight()),
+                         juce::Justification::centred, 1);
+    }
 }
 
 void Vectorscope::resized()

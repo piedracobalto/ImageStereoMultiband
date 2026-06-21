@@ -89,10 +89,10 @@ void ImageStereoMultibandAudioProcessorEditor::timerCallback()
                 auto r = static_cast<double>(snap.scopeRight[i]);
                 sumL += l * l; sumR += r * r; sumLR += l * r;
             }
+            vectorscope.setHasSignal((sumL + sumR) > 1e-10);
             auto denom = std::sqrt(sumL * sumR);
             vectorscope.setCorrelation(denom > 1e-12 ? static_cast<float>(sumLR / denom) : 0.0f);
         }
-        vectorscope.repaint();
 
         auto maxFreq = static_cast<float>(audioProcessor.getCurrentSampleRate()) * 0.5f;
         spectrumCrossoverControls.pushSpectrum(snap.spectrum, AudioAnalyzer::numBins, maxFreq);
@@ -112,4 +112,5 @@ void ImageStereoMultibandAudioProcessorEditor::timerCallback()
         vectorscope.setCorrelation(0.0f);
         vectorscope.clearScopes();
     }
+    vectorscope.tickSmoothing();
 }
