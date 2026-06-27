@@ -34,8 +34,9 @@ private:
     std::array<BandScope, numBands> bandScopes;
     int anyScopeCount = 0;
 
-    float zoomFactor = 6.5f;
+    float zoomFactor = 5.0f;
     bool multiColor = false;
+    bool dirtyScope = false;
 
     juce::TextButton zoomInBtn;
     juce::TextButton zoomOutBtn;

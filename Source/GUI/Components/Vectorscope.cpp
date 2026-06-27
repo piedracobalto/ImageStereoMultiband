@@ -81,6 +81,7 @@ void Vectorscope::pushBandScope(int bandIndex, const float* left, const float* r
         if (b.count > maxCount)
             maxCount = b.count;
     anyScopeCount = maxCount;
+    dirtyScope = true;
 }
 
 void Vectorscope::clearScopes()
@@ -90,6 +91,7 @@ void Vectorscope::clearScopes()
         bs.count = 0;
     hasSignal = false;
     targetCorrelation = 0.0f;
+    dirtyScope = false;
     repaint();
 }
 
@@ -100,8 +102,11 @@ void Vectorscope::tickSmoothing()
     displayCorrelation += diff * 0.12f;
     if (std::abs(diff) < 0.0001f)
         displayCorrelation = targetCorrelation;
-    if (std::abs(displayCorrelation - oldVal) > 0.0005f)
+    if (std::abs(displayCorrelation - oldVal) > 0.0005f || dirtyScope)
+    {
+        dirtyScope = false;
         repaint();
+    }
 }
 
 void Vectorscope::paint(juce::Graphics& g)
@@ -230,16 +235,29 @@ void Vectorscope::paint(juce::Graphics& g)
     }
 
     // Correlation fill (only if signal present)
-    if (hasSignal && std::abs(displayCorrelation) > 0.001f)
+    if (hasSignal)
     {
         auto fillW = (displayCorrelation + 1.0f) * 0.5f * meterBox.getWidth();
         auto fillRect = juce::Rectangle<float>(meterLeft, tickTop, fillW, tickBot - tickTop);
-        auto c = displayCorrelation;
-        auto corrColour = (c > 0.7f) ? juce::Colour(0xff4cd964) :
-                          (c > 0.3f) ? juce::Colour(0xffffd60a) :
-                          (c > -0.3f) ? juce::Colour(0xffff9500) :
-                          (c > -0.7f) ? juce::Colour(0xffff3b30) :
-                          juce::Colour(0xffcc0000);
+        auto c = juce::jlimit(-1.0f, 1.0f, displayCorrelation);
+        static const juce::Colour stops[] = {
+            juce::Colour(0xffcc0000),
+            juce::Colour(0xffff3b30),
+            juce::Colour(0xffff9500),
+            juce::Colour(0xffffd60a),
+            juce::Colour(0xff4cd964),
+        };
+        static const float thresh[] = { -1.0f, -0.7f, -0.3f, 0.3f, 0.7f, 1.0f };
+        auto corrColour = stops[4];
+        for (int i = 0; i < 4; ++i)
+        {
+            if (c >= thresh[i] && c < thresh[i + 1])
+            {
+                auto t = (c - thresh[i]) / (thresh[i + 1] - thresh[i]);
+                corrColour = stops[i].interpolatedWith(stops[i + 1], t);
+                break;
+            }
+        }
         g.setColour(corrColour);
         g.fillRoundedRectangle(fillRect, 2.0f);
     }
@@ -248,7 +266,7 @@ void Vectorscope::paint(juce::Graphics& g)
     g.setFont(juce::FontOptions(10.0f));
     g.setColour(juce::Colour(0xff6f7b87));
     if (hasSignal)
-        g.drawFittedText(juce::String(displayCorrelation, 2),
+        g.drawFittedText(juce::String(displayCorrelation, 1),
                          static_cast<int>(meterBox.getX()),
                          static_cast<int>(meterY),
                          static_cast<int>(meterBox.getWidth()),
