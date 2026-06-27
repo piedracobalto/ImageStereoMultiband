@@ -64,14 +64,14 @@ Cada banda tiene cuatro controles:
 
 | Control | Tipo | Descripción |
 |---------|------|-------------|
-| **Width** | Slider horizontal | Ancho estéreo (0 = mono, 1 = original, 2 = ensanchado) |
-| **Gain** | Slider vertical | Ganancia de -24 dB a +24 dB |
+| **Width** | Slider horizontal | Ancho estéreo (0 = mid/mono, 50 = original, 100 = side). Muestra valor al pasar el ratón; doble click para editar |
+| **Gain** | Slider vertical | Ganancia de -24 dB a +24 dB. Valor editable con doble click |
 | **M** | Botón | Silencia la banda |
 | **S** | Botón | Aísla la banda (solo) |
 
 ### Espectro y cruces
 
-El panel superior muestra el **espectro de frecuencia** en tiempo real. Las líneas verticales con indicador cuadrado son las **frecuencias de cruce** entre bandas. Puedes arrastrarlas con el ratón — los cruces adyacentes mantienen un gap mínimo de 100 Hz.
+El panel superior muestra el **espectro de frecuencia** en tiempo real. Las líneas verticales con indicador cuadrado son las **frecuencias de cruce** entre bandas. Puedes arrastrarlas con el ratón o hacer doble click sobre el valor numérico para editarlo — los cruces adyacentes mantienen un gap mínimo de 100 Hz.
 
 ### Vectoscopio
 
@@ -82,7 +82,7 @@ Visualiza la imagen estéreo en espacio **Mid/Side**:
 - Señal estéreo balanceada → círculo
 - Señal out-of-phase → puntos fuera del círculo de referencia
 
-Botones: **+/-** para zoom, **W/C** para alternar entre blanco y colores por banda.
+Botones: **+/-** para zoom, **W/C** para alternar entre blanco y colores por banda. La banda muteada o sin solo (cuando hay otro solo activo) se atenúa al 5% de opacidad. Botones **−** (remove) y **+** (add) en el panel inferior permiten añadir/quitar bandas en tiempo real.
 
 El medidor inferior muestra la **correlación de fase** (-1 a +1):
 - Verde > 0.7 — Bien correlacionado

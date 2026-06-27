@@ -9,11 +9,14 @@ public:
 
     void setFrequency(int index, float frequency);
 
+    void setNumBands(int n) { activeBands = n; }
+
     void process(
         const juce::AudioBuffer<float>& input,
         std::array<juce::AudioBuffer<float>, 5>& outputs);
 
 private:
+    int activeBands = 5;
 
     // Un par L/R de filtros LR4 por cada crossover
     struct CrossoverPair

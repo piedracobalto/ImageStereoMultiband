@@ -14,12 +14,22 @@ SpectrumCrossoverControls::SpectrumCrossoverControls(juce::AudioProcessorValueTr
     for (int i = 0; i < static_cast<int>(parameterIDs.size()); ++i)
     {
         frequencies[static_cast<size_t>(i)].store(defaultFrequencies[static_cast<size_t>(i)]);
-        parameters[i] = valueTreeState.getParameter(parameterIDs[i]);
         valueTreeState.addParameterListener(parameterIDs[i], this);
 
         if (auto* value = valueTreeState.getRawParameterValue(parameterIDs[i]))
             frequencies[i].store(value->load());
     }
+
+    crossoverEditLabel.setJustificationType(juce::Justification::centred);
+    crossoverEditLabel.setFont(juce::FontOptions(10.0f, juce::Font::bold));
+    crossoverEditLabel.setColour(juce::Label::textColourId, juce::Colour(0xff58c7d9));
+    crossoverEditLabel.setColour(juce::Label::backgroundColourId, juce::Colour(0xff14181d));
+    crossoverEditLabel.setColour(juce::Label::backgroundWhenEditingColourId, juce::Colour(0xff14181d));
+    crossoverEditLabel.setColour(juce::Label::outlineColourId, juce::Colours::transparentBlack);
+    crossoverEditLabel.setEditable(true, true);
+    crossoverEditLabel.setVisible(false);
+    crossoverEditLabel.onEditorHide = [this] { finishEditingCrossover(); };
+    addAndMakeVisible(crossoverEditLabel);
 }
 
 SpectrumCrossoverControls::~SpectrumCrossoverControls()
@@ -44,6 +54,7 @@ void SpectrumCrossoverControls::setBandStates(const bool* muted, const bool* sol
         bandMuted[i] = muted[i];
         bandSoloed[i] = soloed[i];
     }
+    repaint();
 }
 
 void SpectrumCrossoverControls::paint(juce::Graphics& g)
@@ -65,15 +76,12 @@ void SpectrumCrossoverControls::paint(juce::Graphics& g)
     g.reduceClipRegion(graphBounds);
 
     // ---- Band fills between crossovers ----
-    std::array<float, 6> bandEdges
-    {
-        graph.getX(),
-        valueToX(frequencies[0].load()),
-        valueToX(frequencies[1].load()),
-        valueToX(frequencies[2].load()),
-        valueToX(frequencies[3].load()),
-        graph.getRight()
-    };
+    const int activeCrossovers = juce::jmax(0, numBands - 1);
+    std::array<float, 6> bandEdges{};
+    bandEdges[0] = graph.getX();
+    for (int i = 0; i < activeCrossovers; ++i)
+        bandEdges[i + 1] = valueToX(frequencies[i].load());
+    bandEdges[numBands] = graph.getRight();
 
     bool hasSolo = false;
     for (int i = 0; i < numBands; ++i)
@@ -173,7 +181,7 @@ void SpectrumCrossoverControls::paint(juce::Graphics& g)
     }
 
     // ---- Crossover lines with handle labels ----
-    for (int i = 0; i < static_cast<int>(frequencies.size()); ++i)
+    for (int i = 0; i < activeCrossovers; ++i)
     {
         const auto x = valueToX(frequencies[i].load());
         const auto isActive = i == activeHandle;
@@ -213,17 +221,18 @@ void SpectrumCrossoverControls::paint(juce::Graphics& g)
                          1);
     }
 
-    // Crossover frequency labels below markers
-    for (int i = 0; i < static_cast<int>(frequencies.size()); ++i)
+    // Crossover frequency labels below markers - staggered to prevent overlap
+    for (int i = 0; i < activeCrossovers; ++i)
     {
         const auto x = valueToX(frequencies[i].load());
 
-        g.setFont(juce::FontOptions(10.0f));
+        g.setFont(juce::FontOptions(10.0f, juce::Font::bold));
+        g.setColour(juce::Colour(0xff58c7d9));
         g.drawFittedText(formatFrequency(frequencies[i].load()),
                          static_cast<int>(x - 34.0f),
-                         graphBounds.getBottom() + 16,
-                         68,
-                         14,
+                         graphBounds.getBottom() + 12 + i * 8,
+                         60,
+                         12,
                          juce::Justification::centred,
                          1);
     }
@@ -239,13 +248,13 @@ void SpectrumCrossoverControls::paint(juce::Graphics& g)
 
     // dB labels
     g.setFont(juce::FontOptions(10.0f));
-    for (float db : { -80.0f, -60.0f, -40.0f, -20.0f })
+    for (float db : { -60.0f, -40.0f, -20.0f })
     {
         auto y = graph.getY() + graph.getHeight() * (1.0f - (db - minDb) / (maxDb - minDb));
         g.drawFittedText(juce::String(static_cast<int>(db)),
-                         graphBounds.getX() - 30,
+                         graphBounds.getX() - 26,
                          static_cast<int>(y - 8.0f),
-                         28,
+                         22,
                          16,
                          juce::Justification::centredRight,
                          1);
@@ -260,10 +269,8 @@ void SpectrumCrossoverControls::resized()
 
 void SpectrumCrossoverControls::mouseDown(const juce::MouseEvent& event)
 {
+    const int activeCrossovers = juce::jmax(0, numBands - 1);
     activeHandle = findNearestHandle(event.getPosition());
-
-    if (activeHandle >= 0 && parameters[activeHandle] != nullptr)
-        parameters[activeHandle]->beginChangeGesture();
 
     mouseDrag(event);
 }
@@ -278,11 +285,56 @@ void SpectrumCrossoverControls::mouseDrag(const juce::MouseEvent& event)
 
 void SpectrumCrossoverControls::mouseUp(const juce::MouseEvent&)
 {
-    if (activeHandle >= 0 && parameters[activeHandle] != nullptr)
-        parameters[activeHandle]->endChangeGesture();
-
     activeHandle = -1;
     repaint();
+}
+
+void SpectrumCrossoverControls::mouseDoubleClick(const juce::MouseEvent& event)
+{
+    const int activeCrossovers = juce::jmax(0, numBands - 1);
+    auto graphBounds = getGraphBounds();
+
+    for (int i = 0; i < activeCrossovers; ++i)
+    {
+        const auto x = static_cast<int>(valueToX(frequencies[i].load()));
+        auto labelBounds = juce::Rectangle<int>(x - 34,
+                                                graphBounds.getBottom() + 12 + i * 8,
+                                                60, 12);
+        if (labelBounds.contains(event.getPosition()))
+        {
+            startEditingCrossover(i);
+            return;
+        }
+    }
+}
+
+void SpectrumCrossoverControls::startEditingCrossover(int index)
+{
+    editingCrossover = index;
+    const auto x = static_cast<int>(valueToX(frequencies[static_cast<size_t>(index)].load()));
+    auto graphBounds = getGraphBounds();
+    auto labelBounds = juce::Rectangle<int>(x - 26,
+                                            graphBounds.getBottom() + 12 + index * 8,
+                                            48, 12);
+    crossoverEditLabel.setBounds(labelBounds);
+    crossoverEditLabel.setText(formatFrequency(frequencies[static_cast<size_t>(index)].load()),
+                               juce::dontSendNotification);
+    crossoverEditLabel.setVisible(true);
+    crossoverEditLabel.showEditor();
+}
+
+void SpectrumCrossoverControls::finishEditingCrossover()
+{
+    if (editingCrossover < 0)
+        return;
+
+    auto text = crossoverEditLabel.getText();
+    float newFreq = text.getFloatValue();
+    if (newFreq >= minFrequency && newFreq <= maxFrequency)
+        setCrossoverFrequency(editingCrossover, newFreq);
+
+    crossoverEditLabel.setVisible(false);
+    editingCrossover = -1;
 }
 
 void SpectrumCrossoverControls::parameterChanged(const juce::String& parameterID, float newValue)
@@ -307,8 +359,9 @@ juce::Rectangle<int> SpectrumCrossoverControls::getGraphBounds() const
 {
     auto area = getLocalBounds().reduced(14);
     area.removeFromTop(34);
-    area.removeFromBottom(36);
-    return area;
+    area.removeFromBottom(48);
+    area.removeFromLeft(8);
+    return area.reduced(4, 6);
 }
 
 float SpectrumCrossoverControls::valueToX(float frequency) const
@@ -334,13 +387,14 @@ float SpectrumCrossoverControls::xToValue(float x) const
 
 float SpectrumCrossoverControls::getConstrainedFrequency(int index, float frequency) const
 {
+    const int activeCrossovers = juce::jmax(0, numBands - 1);
     auto lowerLimit = minFrequency;
     auto upperLimit = maxFrequency;
 
     if (index > 0)
         lowerLimit = frequencies[static_cast<size_t>(index - 1)].load() + minGapHz;
 
-    if (index < static_cast<int>(frequencies.size()) - 1)
+    if (index < activeCrossovers - 1)
         upperLimit = frequencies[static_cast<size_t>(index + 1)].load() - minGapHz;
 
     return juce::jlimit(lowerLimit, upperLimit, frequency);
@@ -348,14 +402,20 @@ float SpectrumCrossoverControls::getConstrainedFrequency(int index, float freque
 
 void SpectrumCrossoverControls::setCrossoverFrequency(int index, float frequency)
 {
-    if (index < 0 || index >= static_cast<int>(parameters.size()) || parameters[static_cast<size_t>(index)] == nullptr)
+    const int activeCrossovers = juce::jmax(0, numBands - 1);
+    if (index < 0 || index >= activeCrossovers)
         return;
 
     const auto constrainedFrequency = getConstrainedFrequency(index, frequency);
     frequencies[static_cast<size_t>(index)].store(constrainedFrequency);
 
-    auto* parameter = parameters[static_cast<size_t>(index)];
-    parameter->setValueNotifyingHost(parameter->convertTo0to1(constrainedFrequency));
+    // Update via RawParameterValue (thread-safe, no processor pointer needed)
+    if (auto* value = valueTreeState.getRawParameterValue(parameterIDs[static_cast<size_t>(index)]))
+    {
+        auto* param = valueTreeState.getParameter(parameterIDs[static_cast<size_t>(index)]);
+        if (param != nullptr)
+            *value = param->convertTo0to1(constrainedFrequency);
+    }
     repaint();
 }
 
@@ -364,10 +424,11 @@ int SpectrumCrossoverControls::findNearestHandle(juce::Point<int> position) cons
     if (! getGraphBounds().expanded(12, 18).contains(position))
         return -1;
 
+    const int activeCrossovers = juce::jmax(0, numBands - 1);
     auto nearestIndex = -1;
     auto nearestDistance = std::numeric_limits<float>::max();
 
-    for (int i = 0; i < static_cast<int>(frequencies.size()); ++i)
+    for (int i = 0; i < activeCrossovers; ++i)
     {
         const auto distance = std::abs(static_cast<float>(position.x) - valueToX(frequencies[static_cast<size_t>(i)].load()));
 

@@ -13,18 +13,21 @@ public:
 
     void paint(juce::Graphics& g) override;
     void resized() override;
+    void mouseEnter(const juce::MouseEvent& event) override;
+    void mouseExit(const juce::MouseEvent& event) override;
+    void setHasOtherSolo(bool v);
 
 private:
-    static void configureSlider(juce::Slider& slider);
-
     int bandNumber = 1;
     juce::Colour accentColour;
 
     juce::Label titleLabel;
-    juce::Label widthLabel;
     juce::Label gainLabel;
     juce::Slider widthSlider;
     juce::Slider gainSlider;
+    juce::Label gainValueLabel;
+    juce::Label widthLabel;
+    juce::Label widthValueLabel;
     juce::TextButton muteButton { "M" };
     juce::TextButton soloButton { "S" };
 
@@ -32,6 +35,7 @@ private:
     std::unique_ptr<SliderAttachment> gainAttachment;
     std::unique_ptr<ButtonAttachment> muteAttachment;
     std::unique_ptr<ButtonAttachment> soloAttachment;
+    bool hasOtherSolo = false;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(BandStrip)
 };

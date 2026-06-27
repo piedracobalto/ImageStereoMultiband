@@ -13,6 +13,7 @@ public:
     void pushBandScope(int bandIndex, const float* left, const float* right, int count);
     void setCorrelation(float corr) { targetCorrelation = corr; }
     void setHasSignal(bool s);
+    void setNumBands(int n) { numBands = juce::jlimit(2, 5, n); }
     void tickSmoothing();
     void clearScopes();
 
@@ -22,7 +23,8 @@ public:
 
 private:
     static constexpr int maxSamples = 1024;
-    static constexpr int numBands = 5;
+    static constexpr int maxBands = 5;
+    int numBands = 5;
 
     struct BandScope
     {
@@ -31,10 +33,10 @@ private:
         int count = 0;
     };
 
-    std::array<BandScope, numBands> bandScopes;
+    std::array<BandScope, maxBands> bandScopes;
     int anyScopeCount = 0;
 
-    float zoomFactor = 1.5f;
+    float zoomFactor = 5.0f;
     bool multiColor = false;
     bool dirtyScope = false;
 

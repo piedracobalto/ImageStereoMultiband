@@ -19,6 +19,7 @@ public:
     void mouseDown(const juce::MouseEvent& event) override;
     void mouseDrag(const juce::MouseEvent& event) override;
     void mouseUp(const juce::MouseEvent& event) override;
+    void mouseDoubleClick(const juce::MouseEvent& event) override;
 
 private:
     void parameterChanged(const juce::String& parameterID, float newValue) override;
@@ -32,11 +33,15 @@ private:
     int findNearestHandle(juce::Point<int> position) const;
     juce::String formatFrequency(float frequency) const;
 
+    void startEditingCrossover(int index);
+    void finishEditingCrossover();
+
     juce::AudioProcessorValueTreeState& valueTreeState;
     juce::Label titleLabel;
+    juce::Label crossoverEditLabel;
+    int editingCrossover = -1;
 
     std::array<juce::String, 4> parameterIDs;
-    std::array<juce::RangedAudioParameter*, 4> parameters{};
     std::array<std::atomic<float>, 4> frequencies;
     int activeHandle = -1;
 
@@ -51,7 +56,7 @@ private:
 
     static constexpr float minFrequency = 20.0f;
     static constexpr float maxFrequency = 20000.0f;
-    static constexpr float minDb = -96.0f;
+    static constexpr float minDb = -72.0f;
     static constexpr float maxDb = 0.0f;
     static constexpr float minGapHz = 100.0f;
 

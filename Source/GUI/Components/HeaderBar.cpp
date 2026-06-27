@@ -2,7 +2,7 @@
 
 HeaderBar::HeaderBar(juce::AudioProcessorValueTreeState& apvts)
 {
-    titleLabel.setText("ImageStereoMultiband", juce::dontSendNotification);
+    titleLabel.setText("Image Stereo Multiband", juce::dontSendNotification);
     titleLabel.setJustificationType(juce::Justification::centredLeft);
     titleLabel.setColour(juce::Label::textColourId, juce::Colours::white);
     titleLabel.setFont(juce::FontOptions(22.0f, juce::Font::bold));

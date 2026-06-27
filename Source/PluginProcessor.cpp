@@ -42,15 +42,14 @@ ImageStereoMultibandAudioProcessor::createParameters()
 {
     std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
 
-    for (int i = 1; i <= numBands; ++i)
+    for (int i = 1; i <= maxNumBands; ++i)
     {
         params.push_back(
             std::make_unique<juce::AudioParameterFloat>(
                 "band" + juce::String(i) + "Width",
                 "Band " + juce::String(i) + " Width",
-                0.0f,
-                2.0f,
-                1.0f));
+                juce::NormalisableRange<float>(0.0f, 100.0f, 1.0f),
+                50.0f));
 
         params.push_back(
             std::make_unique<juce::AudioParameterFloat>(
@@ -248,6 +247,7 @@ void ImageStereoMultibandAudioProcessor::processBlock(
     juce::ScopedNoDenormals noDenormals;
 
     updateParameters();
+    splitter.setNumBands(numBands);
 
     // Guardar señal original
     dryBuffer.makeCopyOf(buffer);
@@ -325,9 +325,11 @@ void ImageStereoMultibandAudioProcessor::updateParameters()
     {
         auto bandId = juce::String(i + 1);
 
-        bands[i].setWidth(
-            apvts.getRawParameterValue(
-                "band" + bandId + "Width")->load());
+        {
+            auto* wParam = apvts.getParameter("band" + bandId + "Width");
+            auto wNorm = apvts.getRawParameterValue("band" + bandId + "Width")->load();
+            bands[i].setWidth(wParam != nullptr ? wParam->convertFrom0to1(wNorm) : wNorm);
+        }
 
         bands[i].setGain(
             apvts.getRawParameterValue(
@@ -342,34 +344,22 @@ void ImageStereoMultibandAudioProcessor::updateParameters()
                 "band" + bandId + "Solo")->load() > 0.5f);
     }
 
-    float f1 = apvts.getRawParameterValue("crossover1")->load();
-    float f2 = apvts.getRawParameterValue("crossover2")->load();
-    float f3 = apvts.getRawParameterValue("crossover3")->load();
-    float f4 = apvts.getRawParameterValue("crossover4")->load();
-
     constexpr float minBandWidth = 100.0f;
+    const int numCrossovers = numBands - 1;
 
-    f1 = juce::jlimit(20.0f, 19600.0f, f1);
+    for (int i = 0; i < 4; ++i)
+    {
+        auto freq = apvts.getRawParameterValue("crossover" + juce::String(i + 1))->load();
 
-    f2 = juce::jlimit(
-        f1 + minBandWidth,
-        19700.0f,
-        f2);
-
-    f3 = juce::jlimit(
-        f2 + minBandWidth,
-        19800.0f,
-        f3);
-
-    f4 = juce::jlimit(
-        f3 + minBandWidth,
-        19900.0f,
-        f4);
-
-    splitter.setFrequency(0, f1);
-    splitter.setFrequency(1, f2);
-    splitter.setFrequency(2, f3);
-    splitter.setFrequency(3, f4);
+        if (i < numCrossovers)
+        {
+            float lower = (i == 0) ? 20.0f : currentCrossovers[i - 1] + minBandWidth;
+            float upper = 20000.0f - (numCrossovers - 1 - i) * minBandWidth;
+            freq = juce::jlimit(lower, upper, freq);
+            currentCrossovers[i] = freq;
+            splitter.setFrequency(i, freq);
+        }
+    }
 
 
     setBypassed(
@@ -380,9 +370,9 @@ void ImageStereoMultibandAudioProcessor::updateParameters()
 
 bool ImageStereoMultibandAudioProcessor::hasAnySolo() const
 {
-    for (const auto& band : bands)
+    for (int i = 0; i < numBands; ++i)
     {
-        if (band.isSolo())
+        if (bands[i].isSolo())
             return true;
     }
 
@@ -393,21 +383,25 @@ void ImageStereoMultibandAudioProcessor::applySoloLogic()
 {
     const bool anySolo = hasAnySolo();
 
-    for (auto& band : bands)
+    for (int i = 0; i < numBands; ++i)
     {
         float targetGain = 1.0f;
 
         if (anySolo)
         {
-            targetGain = band.isSolo() ? 1.0f : 0.0f;
+            targetGain = bands[i].isSolo() ? 1.0f : 0.0f;
         }
         else
         {
-            targetGain = band.isMuted() ? 0.0f : 1.0f;
+            targetGain = bands[i].isMuted() ? 0.0f : 1.0f;
         }
 
-        band.setLevelTarget(targetGain);
+        bands[i].setLevelTarget(targetGain);
     }
+
+    // Inactive bands get zero gain
+    for (int i = numBands; i < 5; ++i)
+        bands[i].setLevelTarget(0.0f);
 }
 
 //==============================================================================
@@ -465,6 +459,12 @@ juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 juce::AudioProcessorValueTreeState& ImageStereoMultibandAudioProcessor::getAPVTS()
 {
     return apvts;
+}
+
+void ImageStereoMultibandAudioProcessor::setNumBands(int n)
+{
+    numBands = juce::jlimit(2, 5, n);
+    splitter.setNumBands(numBands);
 }
 
 void ImageStereoMultibandAudioProcessor::setBypassed(bool shouldBypass)

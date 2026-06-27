@@ -33,6 +33,8 @@ public:
 private:
     void timerCallback() override;
 
+    void updateBandVisibility();
+
     ImageStereoMultibandAudioProcessor& audioProcessor;
 
     PluginLookAndFeel lookAndFeel;
@@ -40,6 +42,9 @@ private:
     Vectorscope vectorscope;
     SpectrumCrossoverControls spectrumCrossoverControls;
     std::array<std::unique_ptr<BandStrip>, 5> bandStrips;
+
+    juce::TextButton addBandBtn{ "+" };
+    juce::TextButton removeBandBtn{ "-" };
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ImageStereoMultibandAudioProcessorEditor)
 };

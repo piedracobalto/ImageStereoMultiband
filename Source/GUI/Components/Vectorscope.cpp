@@ -4,39 +4,39 @@ Vectorscope::Vectorscope()
     : zoomInBtn("+"), zoomOutBtn("-"), colorBtn("W")
 {
     auto styleBtn = [](juce::TextButton& btn)
-    {
-        btn.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff2a2f36));
-        btn.setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xff3a414a));
-        btn.setColour(juce::TextButton::textColourOffId, juce::Colour(0xff8a9ba8));
-        btn.setColour(juce::TextButton::textColourOnId, juce::Colours::white);
-    };
+        {
+            btn.setColour(juce::TextButton::buttonColourId, juce::Colour(0xff2a2f36));
+            btn.setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xff3a414a));
+            btn.setColour(juce::TextButton::textColourOffId, juce::Colour(0xff8a9ba8));
+            btn.setColour(juce::TextButton::textColourOnId, juce::Colours::white);
+        };
 
     setOpaque(true);
-
-    addAndMakeVisible(zoomInBtn);
-    styleBtn(zoomInBtn);
-    zoomInBtn.onClick = [this]
-    {
-        zoomFactor = juce::jmin(8.0f, zoomFactor + 0.5f);
-        repaint();
-    };
 
     addAndMakeVisible(zoomOutBtn);
     styleBtn(zoomOutBtn);
     zoomOutBtn.onClick = [this]
-    {
-        zoomFactor = juce::jmax(0.5f, zoomFactor - 0.5f);
-        repaint();
-    };
+        {
+            zoomFactor = juce::jmax(0.5f, zoomFactor - 0.5f);
+            repaint();
+        };
+
+    addAndMakeVisible(zoomInBtn);
+    styleBtn(zoomInBtn);
+    zoomInBtn.onClick = [this]
+        {
+            zoomFactor = juce::jmin(8.0f, zoomFactor + 0.5f);
+            repaint();
+        };
 
     addAndMakeVisible(colorBtn);
     styleBtn(colorBtn);
     colorBtn.onClick = [this]
-    {
-        multiColor = !multiColor;
-        colorBtn.setButtonText(multiColor ? "C" : "W");
-        repaint();
-    };
+        {
+            multiColor = !multiColor;
+            colorBtn.setButtonText(multiColor ? "C" : "W");
+            repaint();
+        };
 }
 
 Vectorscope::~Vectorscope() {}
@@ -50,10 +50,8 @@ void Vectorscope::pushScopeData(const float* left, const float* right, int count
     bs.count = count;
     for (int i = 0; i < count; ++i)
     {
-        auto l = left[i];
-        auto r = right[i];
-        bs.mid[i] = (l + r) * 0.5f;
-        bs.side[i] = (l - r) * 0.5f;
+        bs.mid[i] = (left[i] + right[i]) * 0.5f;
+        bs.side[i] = (left[i] - right[i]) * 0.5f;
     }
     anyScopeCount = count;
 }
@@ -68,16 +66,14 @@ void Vectorscope::pushBandScope(int bandIndex, const float* left, const float* r
 
     for (int i = 0; i < bs.count; ++i)
     {
-        auto l = left[i];
-        auto r = right[i];
-        bs.mid[i] = (l + r) * 0.5f;
-        bs.side[i] = (l - r) * 0.5f;
+        bs.mid[i] = (left[i] + right[i]) * 0.5f;
+        bs.side[i] = (left[i] - right[i]) * 0.5f;
     }
 
     int maxCount = 0;
-    for (auto& b : bandScopes)
-        if (b.count > maxCount)
-            maxCount = b.count;
+    for (int i = 0; i < numBands; ++i)
+        if (bandScopes[i].count > maxCount)
+            maxCount = bandScopes[i].count;
     anyScopeCount = maxCount;
     dirtyScope = true;
 }
@@ -94,11 +90,12 @@ void Vectorscope::setHasSignal(bool s)
 void Vectorscope::clearScopes()
 {
     anyScopeCount = 0;
-    for (auto& bs : bandScopes)
-        bs.count = 0;
+    for (auto& bs : bandScopes) bs.count = 0;
     hasSignal = false;
     signalHoldCounter = 0;
     targetCorrelation = 0.0f;
+    displayCorrelation = 0.0f;
+    lastPaintedCorrelation = 0.0f;
     dirtyScope = false;
     repaint();
 }
@@ -119,6 +116,48 @@ void Vectorscope::tickSmoothing()
     }
 }
 
+// ─── layout ───────────────────────────────────────────────────────────────────
+
+struct VSLayout
+{
+    juce::Rectangle<int>   titleBar;
+    juce::Rectangle<int>   toolbar;
+    juce::Rectangle<float> scopeBox;
+    juce::Rectangle<float> meterBox;
+    juce::Rectangle<float> tickBox;
+};
+
+static VSLayout computeLayout(juce::Rectangle<int> total)
+{
+    constexpr int   pad = 14;   // increased outer margin
+    constexpr int   titleH = 22;
+    constexpr int   toolbarH = 26;
+    constexpr float meterH = 16.0f;
+    constexpr float tickH = 12.0f;
+    constexpr float bottomGap = 8.0f;
+
+    auto area = total.reduced(pad);
+
+    VSLayout l;
+    l.titleBar = area.removeFromTop(titleH);
+    area.removeFromTop(4);
+    l.toolbar = area.removeFromTop(toolbarH);
+    area.removeFromTop(6);
+
+    auto scope = area.toFloat();
+
+    l.scopeBox = scope.withTrimmedBottom(meterH + tickH + bottomGap);
+    l.meterBox = { scope.getX(),
+                   l.scopeBox.getBottom() + 4,
+                   scope.getWidth(), meterH };
+    l.tickBox = { scope.getX(),
+                   l.meterBox.getBottom() + 2,
+                   scope.getWidth(), tickH };
+    return l;
+}
+
+// ─── paint ────────────────────────────────────────────────────────────────────
+
 void Vectorscope::paint(juce::Graphics& g)
 {
     auto fullBounds = getLocalBounds().toFloat();
@@ -128,50 +167,42 @@ void Vectorscope::paint(juce::Graphics& g)
     auto bounds = fullBounds.reduced(2.0f);
     g.setColour(juce::Colour(0xff20242a));
     g.fillRoundedRectangle(bounds, 8.0f);
-
     g.setColour(juce::Colour(0xff343941));
     g.drawRoundedRectangle(bounds, 8.0f, 1.0f);
 
-    auto area = getLocalBounds().reduced(12);
+    auto lay = computeLayout(getLocalBounds());
+
+    // Title
     g.setColour(juce::Colours::white);
     g.setFont(juce::FontOptions(14.0f));
-    g.drawFittedText("Vectorscope", area.removeFromTop(22), juce::Justification::centredLeft, 1);
+    g.drawFittedText("Vectorscope", lay.titleBar, juce::Justification::centredLeft, 1);
 
-    // Toolbar: buttons + zoom label
-    auto toolbar = area.removeFromTop(20);
-    g.setFont(juce::FontOptions(11.0f));
+    // Zoom label
+    g.setFont(juce::FontOptions(13.0f));
     g.setColour(juce::Colour(0xff8a9ba8));
-    auto zoomLabelX = zoomInBtn.getBounds().getRight() + 4;
     g.drawFittedText("x" + juce::String(zoomFactor, 1),
-                     zoomLabelX, toolbar.getY(),
-                     50, toolbar.getHeight(),
-                     juce::Justification::centredLeft, 1);
+        zoomInBtn.getRight() + 10, lay.toolbar.getY(),
+        50, lay.toolbar.getHeight(),
+        juce::Justification::centredLeft, 1);
 
-    auto scope = area.reduced(4, 6).toFloat();
-    auto meterHeight = 16.0f;
-    auto tickHeight = 12.0f;
-    auto scopeBox = scope.withTrimmedBottom(meterHeight + tickHeight + 6.0f);
-    auto meterBox = juce::Rectangle<float>(scope.getX(), scopeBox.getBottom() + 4,
-                                           scope.getWidth(), meterHeight);
-    auto tickBox = juce::Rectangle<float>(scope.getX(), meterBox.getBottom() + 2,
-                                          scope.getWidth(), tickHeight);
-
-    auto size = juce::jmin(scopeBox.getWidth(), scopeBox.getHeight()) * 0.45f;
-    auto cx = scopeBox.getCentreX();
-    auto cy = scopeBox.getCentreY();
+    // ── Goniometer ────────────────────────────────────────────────────────────
+    auto& sb = lay.scopeBox;
+    auto  size = juce::jmin(sb.getWidth(), sb.getHeight()) * 0.42f;
+    auto  cx = sb.getCentreX();
+    auto  cy = sb.getCentreY();
 
     g.setColour(juce::Colour(0xff14181d));
-    g.fillRoundedRectangle(scopeBox, 6.0f);
+    g.fillRoundedRectangle(sb, 6.0f);
 
     g.saveState();
-    g.reduceClipRegion(scopeBox.toNearestInt());
+    g.reduceClipRegion(sb.toNearestInt());
 
     // Crosshair
     g.setColour(juce::Colour(0xff252a31));
     g.drawLine(cx - size, cy, cx + size, cy, 0.8f);
     g.drawLine(cx, cy - size, cx, cy + size, 0.8f);
 
-    // Reference squares (correlation rings in mid/side space)
+    // Reference circles
     for (float r : { 0.5f, 1.0f })
     {
         auto radius = r * size;
@@ -179,32 +210,28 @@ void Vectorscope::paint(juce::Graphics& g)
         g.drawEllipse(cx - radius, cy - radius, radius * 2.0f, radius * 2.0f, 0.8f);
     }
 
-    // Mid reference (mono) line
+    // Mid reference line
     g.setColour(juce::Colour(0xff303944).withAlpha(0.5f));
-    auto refLen = size * 0.707f;
-    g.drawLine(cx, cy - refLen, cx, cy + refLen, 0.5f);
+    g.drawLine(cx, cy - size * 0.707f, cx, cy + size * 0.707f, 0.5f);
 
-    // Scope dots colored by band
-    if (anyScopeCount > 0)
+    // Scope dots
+    if (anyScopeCount > 0 && hasSignal)
     {
-        auto dotSize = 1.8f;
-
+        const float dotSize = 1.8f;
         for (int b = 0; b < numBands; ++b)
         {
             auto& bs = bandScopes[static_cast<size_t>(b)];
-            if (bs.count == 0)
-                continue;
+            if (bs.count == 0) continue;
 
             auto colour = multiColor ? BandColours::getBandColour(b)
-                                     : juce::Colour(0xff58c7d9);
+                : juce::Colour(0xff58c7d9);
 
             for (int i = 0; i < bs.count; ++i)
             {
                 auto x = cx + bs.side[i] * size * zoomFactor;
                 auto y = cy - bs.mid[i] * size * zoomFactor;
-
-                if (x >= scopeBox.getX() && x <= scopeBox.getRight() &&
-                    y >= scopeBox.getY() && y <= scopeBox.getBottom())
+                if (x >= sb.getX() && x <= sb.getRight() &&
+                    y >= sb.getY() && y <= sb.getBottom())
                 {
                     auto alpha = juce::jmap<float>(i, 0, bs.count - 1, 0.08f, 0.85f);
                     g.setColour(colour.withAlpha(alpha));
@@ -214,114 +241,114 @@ void Vectorscope::paint(juce::Graphics& g)
         }
     }
 
-    g.restoreState();
-
-    // Labels
+    // ── Labels inside scopeBox ─────────────────────────────────────────────
+    //   G: top-centre, W: right-centre — both inset so they sit inside the box
     g.setColour(juce::Colour(0xff6f7b87));
     g.setFont(juce::FontOptions(10.0f));
-    g.drawFittedText("G", cx + 4, scopeBox.getY() + 4, 16, 14, juce::Justification::centredLeft, 1);
-    g.drawFittedText("W", scopeBox.getX() + 4, cy + 4, 16, 14, juce::Justification::centredLeft, 1);
 
-    // Phase correlation meter
+    // G — near the top centre, inset by ~10px from top edge
+    g.drawFittedText("G",
+        static_cast<int>(cx) - 8,
+        static_cast<int>(sb.getY()) + 8,
+        16, 14,
+        juce::Justification::centred, 1);
+
+    // W — near the right centre, inset from right edge
+    g.drawFittedText("W",
+        static_cast<int>(sb.getRight()) - 16,
+        static_cast<int>(cy) - 7,
+        16, 14,
+        juce::Justification::centredLeft, 1);
+
+    g.restoreState();
+
+    // ── Phase correlation meter ───────────────────────────────────────────────
+    auto& mb = lay.meterBox;
+    float meterLeft = mb.getX();
+    auto  tickTop = mb.getY() + 2;
+    auto  tickBot = mb.getBottom() - 2;
+
     g.setColour(juce::Colour(0xff14181d));
-    g.fillRoundedRectangle(meterBox, 4.0f);
-
-    auto meterY = meterBox.getY();
-    auto meterH = meterBox.getHeight();
-    float meterLeft = meterBox.getX();
-
-    // Background bar
+    g.fillRoundedRectangle(mb, 4.0f);
     g.setColour(juce::Colour(0xff252a31));
-    g.fillRoundedRectangle(meterBox.reduced(0, 2), 2.0f);
+    g.fillRoundedRectangle(mb.reduced(0, 2), 2.0f);
 
-    // Tick marks at -1, -0.5, 0, 0.5, 1
-    auto tickTop = meterY + 2;
-    auto tickBot = meterBox.getBottom() - 2;
     g.setColour(juce::Colour(0xff555555));
     for (float t = -1.0f; t <= 1.0f; t += 0.5f)
     {
-        auto x = meterLeft + (t + 1.0f) * 0.5f * meterBox.getWidth();
+        auto x = meterLeft + (t + 1.0f) * 0.5f * mb.getWidth();
         g.drawVerticalLine(static_cast<int>(x), tickTop, tickBot);
     }
 
-    // Correlation fill
+    if (hasSignal)
     {
-        auto fillW = (displayCorrelation + 1.0f) * 0.5f * meterBox.getWidth();
+        auto fillW = (displayCorrelation + 1.0f) * 0.5f * mb.getWidth();
         auto fillRect = juce::Rectangle<float>(meterLeft, tickTop, fillW, tickBot - tickTop);
         auto c = juce::jlimit(-1.0f, 1.0f, displayCorrelation);
+
         static const juce::Colour stops[] = {
-            juce::Colour(0xffcc0000),
-            juce::Colour(0xffff3b30),
-            juce::Colour(0xffff9500),
-            juce::Colour(0xffffd60a),
+            juce::Colour(0xffcc0000), juce::Colour(0xffff3b30),
+            juce::Colour(0xffff9500), juce::Colour(0xffffd60a),
             juce::Colour(0xff4cd964),
         };
         static const float thresh[] = { -1.0f, -0.7f, -0.3f, 0.3f, 0.7f, 1.0f };
+
         auto corrColour = stops[4];
         for (int i = 0; i < 4; ++i)
         {
             if (c >= thresh[i] && c < thresh[i + 1])
             {
-                auto t = (c - thresh[i]) / (thresh[i + 1] - thresh[i]);
-                corrColour = stops[i].interpolatedWith(stops[i + 1], t);
+                corrColour = stops[i].interpolatedWith(stops[i + 1],
+                    (c - thresh[i]) / (thresh[i + 1] - thresh[i]));
                 break;
             }
         }
-        if (!hasSignal)
-            corrColour = corrColour.withAlpha(0.2f);
         g.setColour(corrColour);
         g.fillRoundedRectangle(fillRect, 2.0f);
     }
 
-    // Correlation text
     g.setFont(juce::FontOptions(10.0f));
     g.setColour(juce::Colour(0xff6f7b87));
-    if (hasSignal)
-        g.drawFittedText(juce::String(displayCorrelation, 1),
-                         static_cast<int>(meterBox.getX()),
-                         static_cast<int>(meterY),
-                         static_cast<int>(meterBox.getWidth()),
-                         static_cast<int>(meterH),
-                         juce::Justification::centred, 1);
-    else
-        g.drawFittedText("---",
-                         static_cast<int>(meterBox.getX()),
-                         static_cast<int>(meterY),
-                         static_cast<int>(meterBox.getWidth()),
-                         static_cast<int>(meterH),
-                         juce::Justification::centred, 1);
+    g.drawFittedText(hasSignal ? juce::String(displayCorrelation, 1) : juce::String("---"),
+        static_cast<int>(mb.getX()), static_cast<int>(mb.getY()),
+        static_cast<int>(mb.getWidth()), static_cast<int>(mb.getHeight()),
+        juce::Justification::centred, 1);
 
     // Tick labels
+    auto& tb = lay.tickBox;
     g.setFont(juce::FontOptions(8.0f));
-    g.setColour(juce::Colour(0xff6f7b87));
     for (float t = -1.0f; t <= 1.0f; t += 0.5f)
     {
-        auto x = meterLeft + (t + 1.0f) * 0.5f * meterBox.getWidth();
+        auto x = meterLeft + (t + 1.0f) * 0.5f * mb.getWidth();
         g.drawFittedText(juce::String(t, 1),
-                         static_cast<int>(x) - 14, static_cast<int>(tickBox.getY()),
-                         28, static_cast<int>(tickBox.getHeight()),
-                         juce::Justification::centred, 1);
+            static_cast<int>(x) - 14, static_cast<int>(tb.getY()),
+            28, static_cast<int>(tb.getHeight()),
+            juce::Justification::centred, 1);
     }
 }
 
+// ─── resized ──────────────────────────────────────────────────────────────────
+
 void Vectorscope::resized()
 {
-    auto area = getLocalBounds().reduced(12);
-    auto titleBar = area.removeFromTop(22);
-    auto toolbar = area.removeFromTop(20);
+    auto lay = computeLayout(getLocalBounds());
+    auto toolbar = lay.toolbar;
 
-    auto btnW = 22;
-    auto btnH = 16;
+    constexpr int btnW = 28, btnH = 20, btnGap = 4;
     auto btnRow = toolbar.withSizeKeepingCentre(toolbar.getWidth(), btnH);
-    zoomOutBtn.setBounds(btnRow.removeFromLeft(btnW).reduced(1, 0));
-    zoomInBtn.setBounds(btnRow.removeFromLeft(btnW).reduced(1, 0));
-    colorBtn.setBounds(btnRow.removeFromRight(btnW).reduced(1, 0));
+
+    zoomOutBtn.setBounds(btnRow.removeFromLeft(btnW));
+    btnRow.removeFromLeft(btnGap);
+    zoomInBtn.setBounds(btnRow.removeFromLeft(btnW));
+    colorBtn.setBounds(btnRow.removeFromRight(btnW));
 }
 
-void Vectorscope::mouseWheelMove(const juce::MouseEvent& event, const juce::MouseWheelDetails& wheel)
+// ─── mouse wheel ──────────────────────────────────────────────────────────────
+
+void Vectorscope::mouseWheelMove(const juce::MouseEvent& event,
+    const juce::MouseWheelDetails& wheel)
 {
     juce::ignoreUnused(event);
-    auto delta = wheel.deltaY * 0.5f;
-    zoomFactor = juce::jlimit(0.5f, 8.0f, zoomFactor + delta);
+    zoomFactor = juce::jlimit(0.5f, 8.0f, zoomFactor + wheel.deltaY * 0.5f);
     repaint();
 }

@@ -74,6 +74,11 @@ public:
     bool isBandMuted(int index) const { return index >= 0 && index < numBands ? bands[index].isMuted() : false; }
     bool isBandSoloed(int index) const { return index >= 0 && index < numBands ? bands[index].isSolo() : false; }
 
+    int getNumBands() const { return numBands; }
+    bool canAddBand() const { return numBands < 5; }
+    bool canRemoveBand() const { return numBands > 2; }
+    void setNumBands(int n);
+
     struct BandScopeBuffer
     {
         static constexpr int size = 512;
@@ -89,7 +94,7 @@ public:
     const BandScopeBuffer& getBandScope(int index) const { return bandScopes[static_cast<size_t>(index)]; }
 
 private:
-    static constexpr int numBands = 5;
+    int numBands = 2;
 
     void updateParameters();
 
@@ -110,9 +115,11 @@ private:
 
     void setBypassed(bool shouldBypass);
 
-    std::array<Band, numBands> bands;
+    static constexpr int maxNumBands = 5;
 
-    std::array<juce::AudioBuffer<float>, numBands> bandBuffers;
+    std::array<Band, maxNumBands> bands;
+
+    std::array<juce::AudioBuffer<float>, maxNumBands> bandBuffers;
 
     std::array<float, 4> currentCrossovers
     {
@@ -123,7 +130,7 @@ private:
     };
 
     AudioAnalyzer analyzer;
-    std::array<BandScopeBuffer, numBands> bandScopes;
+    std::array<BandScopeBuffer, maxNumBands> bandScopes;
     double currentSampleRate = 44100.0;
 
     //==========================================================================

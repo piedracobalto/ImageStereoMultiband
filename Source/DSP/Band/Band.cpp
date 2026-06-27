@@ -48,7 +48,7 @@ void Band::process(juce::AudioBuffer<float>& buffer)
 
 void Band::setWidth(float width)
 {
-    midSide.setSideGain(width);
+    midSide.setSideGain(width * 0.02f);
 }
 
 void Band::setGain(float gainDb)

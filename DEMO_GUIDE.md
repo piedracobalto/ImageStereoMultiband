@@ -1,662 +1,292 @@
-# ImageStereoMultiband — Guía de presentación para desarrolladores
+# ImageStereoMultiband — Design Philosophy & Use Cases
 
-> **Propósito:** Esta guía está diseñada para una demo técnica de 30–45 minutos frente a desarrolladores expertos en C++, JUCE y plugins de audio. Cada sección incluye el tiempo estimado, los archivos a mostrar, los talking points clave y las preguntas frecuentes anticipadas.
-
----
-
-## Índice de la presentación
-
-| # | Sección | Tiempo | Archivos a mostrar |
-|---|---------|--------|-------------------|
-| 1 | Introducción | 2 min | — |
-| 2 | Arquitectura global | 3 min | `PluginProcessor.h` |
-| 3 | Cadena de filtros LR4 | 8 min | `MultibandSplitter.h/.cpp`, `Crossover.h` |
-| 4 | Procesamiento por banda | 8 min | `Band.h/.cpp`, `MidSide.h/.cpp` |
-| 5 | El processBlock completo | 10 min | `PluginProcessor.cpp` |
-| 6 | Analizador FFT | 5 min | `AudioAnalyzer.h/.cpp` |
-| 7 | GUI y visualización | 5 min | `PluginEditor.h/.cpp`, `Vectorscope.h/.cpp`, `SpectrumCrossoverControls.h/.cpp` |
-| 8 | Preguntas y discusión | 5–10 min | — |
+> **Purpose:** This document explains why ImageStereoMultiband exists, what problems it solves, and how technical decisions were made. It's aimed at both developers wanting to understand the architecture and music producers wanting to understand what the plugin does and why it works the way it does.
 
 ---
 
-## 1. Introducción (2 min)
+## Table of Contents
 
-### Qué vas a decir
-
-"ImageStereoMultiband es un plugin VST3 de procesamiento estéreo multibanda. Toma una señal estéreo, la divide en 5 bandas de frecuencia usando filtros Linkwitz-Riley de 4to orden en cascada, y permite controlar el ancho estéreo y la ganancia de cada banda de forma independiente. También incluye un analizador FFT en tiempo real, un vectoscopio Mid/Side con medidor de correlación, y la capacidad de arrastrar los crossovers directamente sobre el espectro."
-
-### Público objetivo
-- Desarrolladores C++ con experiencia en JUCE
-- Ingenieros de audio familiarizados con plugins VST3
-- Personas que entienden procesamiento Mid/Side, FFT, y filtros LR4
-
-### Conceptos que deben conocer de antemano (no explicar en detalle)
-- Qué es un `AudioProcessor` y `AudioProcessorEditor` en JUCE
-- Qué es `AudioProcessorValueTreeState`
-- Conceptos básicos de filtros IIR, Linkwitz-Riley, Mid/Side
-- Diferencia entre hilo de audio y hilo de GUI
+1. [Why a Multiband Stereo Width Plugin?](#1-why-a-multiband-stereo-width-plugin)
+2. [Architecture: The Signal Flow](#2-architecture-the-signal-flow)
+3. [Why 4th-Order Linkwitz-Riley?](#3-why-4th-order-linkwitz-riley)
+4. [Mid/Side: The Heart of Width Control](#4-midside-the-heart-of-width-control)
+5. [Smoothing: Why It Matters](#5-smoothing-why-it-matters)
+6. [The GUI as a Tool, Not an Ornament](#6-the-gui-as-a-tool-not-an-ornament)
+7. [Real-World Use Cases](#7-real-world-use-cases)
+8. [Frequently Asked Questions (Technical & Musical)](#8-frequently-asked-questions-technical--musical)
 
 ---
 
-## 2. Arquitectura global (3 min)
+## 1. Why a Multiband Stereo Width Plugin?
 
-### Archivos a mostrar
-- `PluginProcessor.h`
+### The Musical Problem
 
-### Talking points
+In modern music production, stereo width should rarely be uniform across the entire spectrum. Low frequencies sound better centered (mono) to maintain punch and compatibility with mono sound systems (clubs, radios, smartphones). High frequencies typically benefit from wider stereo to create a sense of space and air.
 
-1. **Abrir `PluginProcessor.h`** y señalar la herencia: `juce::AudioProcessor`.
-2. **Miembros principales:**
-   - `MultibandSplitter splitter` — el divisor de bandas
-   - `std::array<Band, 5> bands` — 5 procesadores de banda
-   - `AudioAnalyzer analyzer` — el analizador FFT
-   - `juce::SmoothedValue<float> bypassMix` — crossfade de bypass
-   - `juce::AudioProcessorValueTreeState apvts` — 25 parámetros
+Traditional stereo width plugins apply the same processing to the entire signal. This creates a dilemma: if you widen everything, the lows become unfocused; if you center everything, the highs lose spaciousness.
 
-3. **Constante clave:** `static constexpr int numBands = 5`
+**ImageStereoMultiband solves this by splitting the spectrum into 5 bands and allowing independent stereo width control on each.**
 
-4. **Explicar el ownership:**
-   - El `Processor` posee todo (composición, no agregación)
-   - El `Editor` recibe solo una referencia al `Processor`
-   - Las bandas se almacenan como `std::array<Band, 5>` — sin heap allocation, contiguo en memoria
+### The Technical Problem
 
-5. **Mencionar `BandScopeBuffer`:**
-   - Buffer circular de 512 samples por banda para visualización
-   - `friend class ImageStereoMultibandAudioProcessor` — decisión de diseño intencional
-
-### Pregunta anticipada
-
-**P:** "¿Por qué `std::array` y no `std::vector` para las bandas?"
-**R:** Porque el número de bandas es fijo (5) y conocido en tiempo de compilación. `std::array` da ubicación contigua garantizada, evita heap allocation, y permite `constexpr`. Si quisiéramos hacer el número de bandas configurable en runtime, usaríamos `std::vector`.
+Splitting audio into bands without artifacts requires special filters. Most simple crossovers introduce phase issues at the crossover region that distort the stereo image. 4th-order Linkwitz-Riley filters (LR4) are specifically designed for this: their sum is perfectly flat in magnitude, meaning there's no loss or emphasis at crossover frequencies when recombining the bands.
 
 ---
 
-## 3. Cadena de filtros LR4 (8 min)
-
-### Archivos a mostrar
-- `MultibandSplitter.h` (completo)
-- `MultibandSplitter.cpp` (completo)
-
-### Talking points
-
-#### 3.1 La estructura `CrossoverPair` (privada anidada)
-
-**Mostrar `MultibandSplitter.h:19-74`:**
-
-```cpp
-struct CrossoverPair
-{
-    juce::dsp::LinkwitzRileyFilter<float> lowL, lowR;
-    juce::dsp::LinkwitzRileyFilter<float> highL, highR;
-    juce::SmoothedValue<float> frequency;
-    // ...
-};
-```
-
-**Explicar:**
-- 4 filtros por crossover (lowL, lowR, highL, highR)
-- Los filtros de JUCE son monoaurales — necesitamos uno por canal para estéreo
-- `SmoothedValue` con 50 ms de rampa para evitar zipper noise en automatización de frecuencia
-
-**Pregunta para la audiencia:** "¿Alguien sabe por qué usamos 4 filtros y no 2?"
-**Respuesta:** Porque `LinkwitzRileyFilter` procesa un solo canal. Para estéreo necesitamos lowpass L/R y highpass L/R = 4 filtros.
-
-#### 3.2 La cascada en `MultibandSplitter::process()`
-
-**Mostrar `MultibandSplitter.cpp:18-70`:**
-
-Lo más importante aquí es **el procesamiento sample a sample**:
-
-```cpp
-for (int s = 0; s < numSamples; ++s)
-{
-    for (auto& crossover : crossovers)
-        crossover.updateFrequency();
-
-    float l = input.getSample(0, s);
-    float r = input.getSample(1, s);
-
-    auto [l0, r0] = crossovers[0].processLow(l, r);
-    auto [lH0, rH0] = crossovers[0].processHigh(l, r);
-    // ... cascada continúa ...
-}
-```
-
-**Talking point clave:** "Cada crossover produce un lowpass (banda actual) y un highpass (alimenta el siguiente). La salida del highpass de cada etapa es la entrada del siguiente crossover. Así, el crossover N-1 produce la banda N (lowpass) y el residual pasa a la siguiente etapa."
-
-**Dibujar en pizarra/diagrama:**
+## 2. Architecture: The Signal Flow
 
 ```
-Input → Crossover[0]: lowpass → Band[0]
-                       highpass → Crossover[1]: lowpass → Band[1]
-                                                 highpass → Crossover[2]: lowpass → Band[2]
-                                                           highpass → Crossover[3]: lowpass → Band[3]
-                                                                     highpass → Band[4]
+Stereo Input → LR4 Splitter → 5 Independent Bands → Sum → Bypass → Output
 ```
 
-#### 3.3 ¿Por qué sample a sample y no por bloques?
+Each stage exists for a reason:
 
-**Talking point:** "La actualización de frecuencia es sample a sample porque `SmoothedValue` necesita ser evaluado en cada sample para producir una transición suave. Si actualizáramos la frecuencia una vez por bloque (ej. 512 samples), los cambios abruptos en la automatización producirían escalones audibles."
+| Stage | What it does | Why |
+|-------|-------------|-----|
+| **LR4 Splitter** | Divides the signal into 5 bands with cascaded Linkwitz-Riley filters | Phase-coherent splitting; flat response when summed |
+| **MidSide per band** | Converts each band to Mid/Side, applies Side gain, converts back | Independent stereo width control per frequency range |
+| **Gain per band** | Applies independent volume | Compensate level differences when modifying width |
+| **Mute/Solo** | Silences or isolates bands | Diagnose which frequency range you're modifying |
+| **Sum** | Recombines the 5 bands into stereo output | LR4 guarantees flat sum (0 dB at crossover) |
+| **Bypass** | 50 ms linear crossfade | Prevents pops when enabling/disabling processing |
 
-**Demostración conceptual:**
-- Automatización lineal de 500 Hz a 2000 Hz en 100 ms
-- A 44100 Hz, son ~4410 samples de transición
-- Con procesamiento por bloques de 512, solo tendríamos ~8.6 puntos de actualización → escalones audibles
-- Con sample a sample, 4410 pasos → transición imperceptible
+### Why 5 bands? Isn't that too many?
 
-#### 3.4 La clase `Crossover` independiente (mencionar brevemente)
+Five bands with default frequencies 120, 500, 2000, 8000 Hz cover the most musically relevant ranges:
 
-**Mostrar `Crossover.h/.cpp`:**
+- **Band 1 (sub-bass, < 120 Hz):** Deep lows. Best kept mono.
+- **Band 2 (bass, 120–500 Hz):** Body and warmth. Caution when widening.
+- **Band 3 (mids, 500–2000 Hz):** Instrument and vocal presence. Extreme width here can mask the lead vocal.
+- **Band 4 (upper mids, 2–8 kHz):** Attack and definition. Moderate widening is beneficial.
+- **Band 5 (highs, > 8 kHz):** Air and brilliance. Safe to widen aggressively.
 
-"Existe una clase `Crossover` separada que no se usa actualmente — el `MultibandSplitter` tiene su propia versión interna `CrossoverPair`. La clase `Crossover` está lista para refactorizarse si queremos extraer la lógica a un módulo reutilizable."
+Choosing 5 bands (rather than 3 or 8) was a balance between flexibility and usability. Enough to separate critical ranges, not so many as to overwhelm the user.
 
 ---
 
-## 4. Procesamiento por banda (8 min)
+## 3. Why 4th-Order Linkwitz-Riley?
 
-### Archivos a mostrar
-- `Band.h`, `Band.cpp`
-- `MidSide.h`, `MidSide.cpp`
+There are many ways to split the spectrum. Common alternatives and their problems:
 
-### Talking points
+### Butterworth Filters
+The simplest filters. 12 dB/octave slope per stage. **Problem:** At the crossover frequency they have -3 dB. Summing lowpass + highpass produces a +3 dB peak. For a multiband plugin, this means crossover frequencies would have 3 dB more volume — audibly undesirable.
 
-#### 4.1 La clase `Band`
+### Linkwitz-Riley Filters (LR4)
+Two cascaded 2nd-order Butterworth = 4th-order, 24 dB/octave. **Key property:** At the crossover frequency they have -6 dB, but summing lowpass + highpass gives 0 dB — perfectly flat response.
 
-**Mostrar `Band.h` y `Band.cpp`:**
+### FIR Filters
+Linear phase, no phase distortion. **Problem:** Achieving 24 dB/octave requires hundreds of taps. High latency (~1000 samples), high CPU cost. Not practical for real-time plugin use.
 
-```cpp
-class Band {
-    Midside midSide;
-    juce::SmoothedValue<float> bandGain;   // 20 ms ramp
-    juce::SmoothedValue<float> levelGain;  // 20 ms ramp
-    bool muted = false;
-    bool solo = false;
-};
+### Conclusion
+LR4 is the industry standard for mastering and mixing crossover plugins for a reason: it provides the necessary slope separation without introducing audible artifacts in the sum, with minimal latency and low CPU cost.
+
+### Implementation: Cascade vs. Parallel
+
+This plugin uses **cascade mode**: each crossover receives the highpass from the previous one.
+
+```
+Input → Crossover 0 → lowpass = Band 0
+                    → highpass → Crossover 1 → lowpass = Band 1
+                                             → highpass → ... → Band 4
 ```
 
-**Concepto clave: dos SmoothedValues independientes**
+**Advantage:** Only 4 crossovers are needed for 5 bands (the final highpass is the highest band). Filters are reused — band N passes through fewer filters than band 0, but the total sum remains coherent.
 
-"Tenemos `bandGain` (lo que mueve el usuario con el slider) y `levelGain` (controlado por la lógica de mute/solo). Separarlos permite que el mute/solo tenga su propia rampa de 20 ms independiente del slider de ganancia. Se multiplican en `process()`."
+**Disadvantage:** Phase accumulates (each band passes through a different number of filters). However, with LR4 this doesn't affect magnitude, and in practice it's inaudible because all bands are summed within the same processing block.
 
-**En `Band::process()`:**
+---
 
-```cpp
-for (int sample = 0; sample < buffer.getNumSamples(); ++sample)
-{
-    auto gain = bandGain.getNextValue();
-    auto level = levelGain.getNextValue();
-    auto totalGain = gain * level;
-    left[sample] *= totalGain;
-    right[sample] *= totalGain;
-}
+## 4. Mid/Side: The Heart of Width Control
+
+### What is Mid/Side?
+
+Mid/Side (M/S) is a stereo signal representation that separates:
+
+- **Mid (M):** What sounds the same in both channels (L + R) — the monaural information
+- **Side (S):** The difference between channels (L - R) — the stereo information
+
+```
+Mid  = (L + R) / √2
+Side = (L - R) / √2
 ```
 
-**Pregunta para la audiencia:** "¿Por qué multiplicamos en lugar de sumar?"
-**Respuesta:** Porque son factores de ganancia lineal. En dB sumarías, pero en lineal es multiplicación. 6 dB + 6 dB = 12 dB → en lineal: 2.0 × 2.0 = 4.0.
+### Why Mid/Side for Width Control?
 
-#### 4.2 La clase `Midside` — El corazón del control de ancho estéreo
+Because stereo width is controlled by adjusting the Side component's gain:
 
-**Mostrar `MidSide.h` y `MidSide.cpp` completo:**
+- **Side gain = 0** → Mid only → Mono
+- **Side gain = 1** → Original Side → Original width
+- **Side gain > 1** → Amplified Side → Wider signal
 
-```cpp
-void Midside::process(juce::AudioBuffer<float>& buffer)
-{
-    for (int sample = 0; sample < numSamples; ++sample)
-    {
-        auto left  = buffer.getSample(0, sample);
-        auto right = buffer.getSample(1, sample);
+This is cleaner than using L/R balance or delays because it preserves phase relationships between channels.
 
-        // IIR smoothing
-        smoothMid = smoothMid - (0.002f * (smoothMid - midGain));
-        smoothSide = smoothSide - (0.002f * (smoothSide - sideGain));
+### The Math Behind Power Conservation
 
-        // Encode
-        auto mid  = (left + right) * smoothMid / std::sqrt(2.0f);
-        auto side = (left - right) * smoothSide / std::sqrt(2.0f);
+The `√2` factor is not arbitrary. It guarantees a mono signal (L = R) passes through unchanged:
 
-        // Decode
-        auto newLeft  = (mid + side) / std::sqrt(2.0f);
-        auto newRight = (mid - side) / std::sqrt(2.0f);
-
-        buffer.setSample(0, sample, newLeft);
-        buffer.setSample(1, sample, newRight);
-    }
-}
 ```
-
-**Explicación matemática en 3 pasos:**
-
-1. **Codificación:**
-   - `Mid = (L + R) / √2` — lo común entre ambos canales
-   - `Side = (L - R) / √2` — la diferencia (información estéreo)
-
-2. **Procesamiento:**
-   - `mid *= smoothMid` — siempre 1.0 en esta versión
-   - `side *= smoothSide` — controla el ancho estéreo (width)
-
-3. **Decodificación:**
-   - `L' = (Mid + Side) / √2`
-   - `R' = (Mid - Side) / √2`
-
-**Talking point: El factor √2**
-
-"El factor √2 garantiza conservación de potencia. Si entra una señal mono (L = R = x), el Mid es 2x/√2 = x√2, el Side es 0, y a la salida tenemos L' = R' = x√2/√2 = x. Sin el √2, tendríamos L' = R' = 2x — el doble de amplitud."
-
-**Demostración rápida en pizarra:**
-```
-L = R = 1 (señal mono)
-Mid = (1+1)/√2 = 2/√2 = √2 ≈ 1.414
+L = R = 1
+Mid = (1+1)/√2 = √2 ≈ 1.414
 Side = (1-1)/√2 = 0
-L' = (1.414 + 0)/√2 = 1 ✓
-R' = (1.414 - 0)/√2 = 1 ✓
+L' = (1.414 + 0)/√2 = 1
+R' = (1.414 + 0)/√2 = 1
 ```
 
-**Talking point: El IIR smoothing**
+Without `√2`, a mono signal would double in amplitude when passing through the encoder/decoder.
 
-```cpp
-smoothSide = smoothSide - (0.002f * (smoothSide - sideGain));
-```
+### Why isn't midGain exposed?
 
-"Esto es un filtro IIR de primer orden, también llamado one-pole lowpass o leaky integrator. Es equivalente a:
-`smoothSide += 0.002 × (sideGain - smoothSide)`
-
-El coeficiente 0.002 produce una constante de tiempo τ ≈ 1 / (0.002 × 44100) ≈ 11.3 ms. Elegimos este enfoque en lugar de `SmoothedValue` porque la curva exponencial suena más natural que una rampa lineal — es análoga a un circuito RC."
+In the current version, `midGain` is always 1.0. This is a deliberate UI decision: stereo width control is what users need to adjust, and mid gain would add complexity without a clear benefit for the primary use case. The `Midside` class already supports `setMidGain()` for future versions.
 
 ---
 
-## 5. El processBlock completo (10 min)
+## 5. Smoothing: Why It Matters
 
-### Archivos a mostrar
-- `PluginProcessor.cpp` (líneas 244–318)
+The plugin uses three types of smoothing to prevent audible artifacts:
 
-### Talking points
+### a) SmoothedValue on Crossovers (50 ms)
 
-**Leer el código de `processBlock` en voz alta, explicando cada paso:**
+When you drag a crossover, the cutoff frequency doesn't change instantly. The `SmoothedValue` produces a 50 ms linear ramp. Without this, every movement would produce "zipper noise" — audible steps in the cutoff frequency.
 
-```cpp
-void ImageStereoMultibandAudioProcessor::processBlock(
-    juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
-{
-    juce::ScopedNoDenormals noDenormals;
-    updateParameters();
-```
+**Why 50 ms?** Fast enough to follow real-time mouse movements, slow enough for the transition to be imperceptible. It's the standard in professional plugins.
 
-**Paso 1 — `ScopedNoDenormals`:**
-"Prevención de denormales. Cuando los coeficientes de los filtros producen valores muy pequeños (cercanos a cero), la FPU x86 entra en modo lento. Este RAII wrapper configura el estado de la FPU para que trate los denormales como cero."
+### b) SmoothedValue on Gain (20 ms)
 
-**Paso 2 — `updateParameters()`:**
-"Sincroniza todos los parámetros desde el APVTS. Notar que los crossovers se limitan con un gap mínimo de 100 Hz para evitar que dos bandas colapsen:
+- `bandGain`: controlled by the gain slider
+- `levelGain`: controlled by mute/solo logic
+
+Separating them allows mute/solo to have its own 20 ms ramp independent of the gain slider. Muting isn't instantaneous — there's a 20 ms fade in/out that eliminates pops.
+
+### c) IIR Smoothing on Mid/Side (~11 ms)
+
+Mid/Side uses a first-order IIR filter (one-pole lowpass) instead of `SmoothedValue`:
 
 ```cpp
-f2 = juce::jlimit(f1 + minBandWidth, 19700.0f, f2);
-f3 = juce::jlimit(f2 + minBandWidth, 19800.0f, f3);
-f4 = juce::jlimit(f3 + minBandWidth, 19900.0f, f4);
+smoothSide += 0.002f * (sideGain - smoothSide)
 ```
 
-La dependencia en cadena asegura que f2 > f1 + 100, f3 > f2 + 100, etc."
-
-```cpp
-    dryBuffer.makeCopyOf(buffer);
-```
-
-**Paso 3 — Dry buffer:**
-"Copia del buffer original para el crossfade de bypass. Tiene que hacerse **antes** de cualquier modificación."
-
-```cpp
-    splitter.process(buffer, bandBuffers);
-```
-
-**Paso 4 — Splitter:**
-"Divide en 5 bandas. Ya vimos cómo funciona en la sección 3. Las bandas salen en `bandBuffers[0..4]`."
-
-```cpp
-    for (int i = 0; i < numBands; ++i)
-        bands[i].process(bandBuffers[i]);
-```
-
-**Paso 5 — Band processing:**
-"Cada banda aplica Mid/Side y ganancia. Ya vimos esto en la sección 4."
-
-```cpp
-    applySoloLogic();
-```
-
-**Paso 6 — Solo logic:**
-"Aplica mute/solo mediante `setLevelTarget()`. Si hay algún solo activo, las bandas sin solo se silencian. Si no hay solos, respeta los mute."
-
-**Explicar la lógica:**
-
-```cpp
-void applySoloLogic() {
-    const bool anySolo = hasAnySolo();
-    for (auto& band : bands) {
-        float target = 1.0f;
-        if (anySolo)
-            target = band.isSolo() ? 1.0f : 0.0f;
-        else
-            target = band.isMuted() ? 0.0f : 1.0f;
-        band.setLevelTarget(target);
-    }
-}
-```
-
-"La ventaja de usar `setLevelTarget` con suavizado de 20 ms es que el mute/solo no produce clicks — la ganancia sube o baja gradualmente."
-
-```cpp
-    // Capturar scopes para visualización
-    for (int b = 0; b < numBands; ++b) {
-        // ... buffer circular por banda ...
-    }
-
-    buffer.clear();
-    for (int band = 0; band < numBands; ++band) {
-        for (int ch = 0; ch < buffer.getNumChannels(); ++ch) {
-            buffer.addFrom(ch, 0, bandBuffers[band], ch, 0, buffer.getNumSamples());
-        }
-    }
-```
-
-**Paso 7-8 — Suma de bandas:**
-"Limpiamos el buffer de salida y sumamos todas las bandas procesadas. Como cada banda ocupa un rango espectral diferente (gracias a los filtros LR4), la suma reconstruye la señal completa sin artefactos."
-
-**Talking point: Por qué LR4 suma plano**
-
-"La propiedad clave de Linkwitz-Riley: la suma del lowpass y highpass en la misma frecuencia produce una respuesta en magnitud plana (0 dB). Esto es porque los filtros LR4 tienen 0 dB en la frecuencia de cruce, a diferencia de Butterworth que tiene -3 dB. Así que al sumar las 5 bandas, la respuesta en frecuencia es plana si todas las ganancias están a 0 dB."
-
-```cpp
-    analyzer.process(buffer);
-```
-
-**Paso 9 — Analyzer:**
-"Procesamos el FFT sobre el buffer post-ganancia pero pre-bypass. Así el análisis refleja el procesamiento del usuario."
-
-```cpp
-    // Bypass crossfade
-    for (int sample = 0; sample < buffer.getNumSamples(); ++sample)
-    {
-        auto mix = bypassMix.getNextValue();
-        for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
-        {
-            auto wet = buffer.getSample(ch, sample);
-            auto dry = dryBuffer.getSample(ch, sample);
-            buffer.setSample(ch, sample, wet * mix + dry * (1.0f - mix));
-        }
-    }
-```
-
-**Paso 10 — Bypass crossfade:**
-"Crossfade lineal de 50 ms. `bypassMix` es un `SmoothedValue` que rampa de 1.0 (wet) a 0.0 (dry) o viceversa. Esto evita el pop que ocurriría con un bypass abrupto."
-
-**Pregunta para la audiencia:** "¿Qué problema tiene este crossfade lineal?"
-**Respuesta:** El crossfade lineal no es de potencia constante — hay una atenuación de ~3 dB en el centro del crossfade. Para potencia constante se usaría `out = wet × √mix + dry × √(1-mix)`. Sin embargo, para bypass, la atenuación temporal de 3 dB es preferible a un pop.
+**Why an IIR filter instead of a linear ramp?** Its exponential curve is analogous to an analog RC circuit, and sounds more natural to the human ear than a linear transition. The ~11 ms time constant is fast enough for real-time tracking, slow enough to prevent clicks.
 
 ---
 
-## 6. Analizador FFT (5 min)
+## 6. The GUI as a Tool, Not an Ornament
 
-### Archivos a mostrar
-- `AudioAnalyzer.h`
-- `AudioAnalyzer.cpp`
+Every visual element exists to solve a specific problem:
 
-### Talking points
+### FFT Spectrum with Draggable Crossovers
+- **Problem:** Adjusting crossover frequencies blindly requires trial and error
+- **Solution:** See the spectrum in real-time and drag crossover lines directly on it
+- **Logarithmic scale** because the ear perceives frequency logarithmically
+- **Minimum 100 Hz gap** between crossovers to prevent band collapse
 
-#### Constantes
+### Mid/Side Vectorscope
+- **Problem:** The ear doesn't always detect phase or stereo correlation issues
+- **Solution:** Real-time visualization of the stereo image in Mid/Side space
+- **Y axis = Mid, X axis = Side** — a perfectly mono signal appears as a vertical line, balanced stereo as a circle, out-of-phase content as points outside the circle
 
-```cpp
-static constexpr int fftOrder = 11;   // 2^11 = 2048
-static constexpr int fftSize  = 2048;
-static constexpr int numBins  = 1024;
-static constexpr int scopeSize = 1024;
-```
+### Correlation Meter
+- **Problem:** Knowing whether your signal will survive mono summing
+- **Solution:** Color-coded bar (+1 green, 0 orange, -1 red) with numeric value
 
-"FFT de 2048 puntos nos da ~21.5 Hz de resolución a 44100 Hz. Suficiente para ver sub-bajos, aunque en 48 kHz serían ~23 Hz/bin."
+### Mute/Solo
+- **Problem:** Not knowing which frequency range you're modifying
+- **Solution:** Solo isolates a band to hear it alone; Mute temporarily removes it
 
-#### El FIFO circular
+### Why muted/dimmed bands fade to 5% opacity
+It's immediate visual feedback: you can see which bands are active without reading labels. 5% is enough to still see the band's color but makes it obviously disabled.
 
-```cpp
-std::array<float, fftSize> fifo{};
-int fifoIndex = 0;
-```
-
-"En cada sample, escribimos la señal mono (L+R)/2 en `fifo[fifoIndex++ % 2048]`. Es un buffer circular — cuando llegamos al final, volvemos al principio sobrescribiendo los datos más viejos."
-
-#### El hop y la ventana Hann
-
-```cpp
-fftHop = fftSize / 4;  // 512 → 75% overlap
-```
-
-"Cada 512 samples (en lugar de 2048) hacemos una FFT. Esto es 75% de overlap — cada FFT comparte 1536 samples con la anterior. Esto suaviza la visualización pero cuadruplica el costo computacional."
-
-**Ventana Hann:**
-
-```cpp
-auto hann = 0.5f * (1.0f - std::cos(2.0f * pi * i / (fftSize - 1)));
-```
-
-"La ventana Hann reduce el leakage espectral (artefactos de discontinuidad en los bordes). Atenuación de lóbulos laterales de ~32 dB."
-
-#### Cálculo de magnitud a dB
-
-```cpp
-// Bins 1 a N/2 - 1
-auto real = fftData[2 * i];
-auto imag = fftData[2 * i + 1];
-auto mag = std::sqrt(real * real + imag * imag) / fftSize;
-workingSnapshot.spectrum[i] = Decibels::gainToDecibels(mag, -120.0f);
-```
-
-"Piso de -120 dB para evitar log(0)."
-
-#### Comunicación atómica con la GUI
-
-```cpp
-// Audio thread:
-ready.store(true);
-
-// GUI thread:
-if (!ready.exchange(false))
-    return false;  // No new data
-// Safe copy from workingSnapshot
-```
-
-**Talking point clave:**
-
-"`ready.exchange(false)` es una operación atómica RMW (Read-Modify-Write). Retorna el valor anterior y establece false en una instrucción. Esto es lock-free, no bloquea ningún hilo, y es seguro porque el hilo de audio solo escribe `workingSnapshot` cuando `ready` es false."
+### Width: 0–100 slider vs. 0.0–2.0
+The internal parameter uses 0–100 (integers) and converts to side gain (0.0–2.0) via `width * 0.02f`. Range 0–100 is more intuitive (0=mono, 50=original, 100=maximum side) than a decimal 0.0–2.0 that needs explanation. The value shows on hover over the slider and can be edited with double-click.
 
 ---
 
-## 7. GUI y visualización (5 min)
+## 7. Real-World Use Cases
 
-### Archivos a mostrar
-- `PluginEditor.cpp` (timerCallback)
-- `Vectorscope.cpp` (paint)
-- `SpectrumCrossoverControls.cpp` (paint, mouse handlers)
+### Mastering: Centered Lows, Wide Highs
 
-### Talking points
+**Problem:** A mix sounds narrow in highs but the bass is too wide, causing phase issues when summed to mono.
 
-#### 7.1 El timer a 30 Hz
+**Solution:**
+1. Width on band 1 (sub-bass) → 0 (forced mono)
+2. Width on band 2 (bass) → 0.3–0.5 (partially centered)
+3. Width on bands 4 and 5 (highs) → 1.2–1.5 (widened)
 
-```cpp
-void ImageStereoMultibandAudioProcessorEditor::timerCallback()
-{
-    AudioAnalyzer::Snapshot snap;
-    if (audioProcessor.getAnalyzer().consumeSnapshot(snap))
-    {
-        // Push band scopes to vectorscope
-        // Calculate correlation
-        // Push spectrum
-        // Set band states
-        spectrumCrossoverControls.repaint();
-    }
-    vectorscope.tickSmoothing();
-}
-```
+**Result:** Solid, centered lows; wide but coherent highs; zero phase cancellation in mono.
 
-"Cada 33 ms, el timer consume el snapshot del analizador. El `consumeSnapshot` es atómico, así que no hay condiciones de carrera con el hilo de audio."
+### Mixing: Controlling Width on a Pad Masking the Vocal
 
-#### 7.2 El cálculo de correlación
+**Problem:** A wide synth pad competes with the lead vocal in the center.
 
-```cpp
-double sumL = 0.0, sumR = 0.0, sumLR = 0.0;
-for (int i = 0; i < snap.scopeCount; ++i) {
-    sumL += l*l; sumR += r*r; sumLR += l*r;
-}
-auto denom = std::sqrt(sumL * sumR);
-correlation = static_cast<float>(sumLR / denom);
-```
+**Solution:**
+1. Identify the vocal range (300 Hz – 3 kHz)
+2. Adjust crossovers to isolate that range in band 2 or 3
+3. Reduce Width on that band to 0.5–0.7
+4. Keep Width high on the outer bands to preserve the pad's spaciousness
 
-"Correlación = Σ(L×R) / √(ΣL² × ΣR²). Es el coseno del ángulo entre los dos vectores de señal. +1 = mono perfecto, 0 = no correlacionado, -1 = fase invertida."
+**Result:** The vocal cuts through without needing to increase its volume — just by reducing stereo competition in its range.
 
-#### 7.3 Vectorscope M/S
+### Restoration: Phase Correction on Drums
 
-**Mostrar la transformación de coordenadas en `Vectorscope.cpp`:**
+**Problem:** A drum recording with out-of-phase microphones, sounding hollow.
 
-```cpp
-auto x = cx + bs.side[i] * size * zoomFactor;
-auto y = cy - bs.mid[i] * size * zoomFactor;
-```
+**Solution:**
+1. Observe the vectorscope — if correlation is negative in certain bands, there's cancellation
+2. Use Solo to identify which band has the lowest correlation
+3. Reduce Width to 0 (mono) on that band to force phase coherence
 
-"Side → X, Mid → Y. Y está invertido porque en pantalla Y crece hacia abajo. El zoomFactor va de 0.5× a 8.0×."
+**Result:** Drums regain punch without losing stereo image in non-problematic bands.
 
-**Transparencia progresiva:**
-```cpp
-auto alpha = juce::jmap<float>(i, 0, bs.count - 1, 0.08f, 0.85f);
-```
+### Sound Design: Extreme Creative Widening
 
-"Los samples más viejos tienen alpha 8%, los más nuevos 85%. Crea un efecto de persistencia — como un osciloscopio analógico."
+**Problem:** A dramatic effect is needed for a breakdown or transition.
 
-#### 7.4 Spectrum con handles arrastrables
+**Solution:**
+1. Width on all bands → 1.5–2.0
+2. Automate crossovers to create movement in the stereo image
+3. Mute specific bands to create "spectral holes"
 
-**Mostrar `SpectrumCrossoverControls.cpp`:**
-
-**Transformación logarítmica:**
-```cpp
-float valueToX(float frequency) {
-    auto proportion = (log10(f) - log10(20)) / (log10(20000) - log10(20));
-    return graphX + graphWidth * proportion;
-}
-```
-
-"El oído humano percibe la frecuencia en escala logarítmica. Por eso mapeamos log10(f) linealmente al eje X."
-
-**Drag de crossovers:**
-```cpp
-void mouseDown() {
-    activeHandle = findNearestHandle(event.getPosition());
-    if (activeHandle >= 0)
-        parameters[activeHandle]->beginChangeGesture();
-}
-void mouseDrag() {
-    setCrossoverFrequency(activeHandle, xToValue(event.x));
-}
-void mouseUp() {
-    if (activeHandle >= 0)
-        parameters[activeHandle]->endChangeGesture();
-    activeHandle = -1;
-}
-```
-
-"`beginChangeGesture()` y `endChangeGesture()` son importantes para la automatización del DAW. Sin ellos, el DAW no sabría cuándo empieza y termina un movimiento."
-
-**Constraints:**
-```cpp
-float getConstrainedFrequency(int index, float frequency) {
-    auto lower = (index > 0) ? frequencies[index-1] + 100 : 20;
-    auto upper = (index < 3) ? frequencies[index+1] - 100 : 20000;
-    return jlimit(lower, upper, frequency);
-}
-```
-
-"Gap mínimo de 100 Hz entre cruces. Sin esto, dos bandas podrían colapsar en la misma frecuencia."
+**Warning:** Extreme widening can cause listening fatigue and phase issues. Check correlation on the vectorscope.
 
 ---
 
-## 8. Preguntas y discusión (5–10 min)
+## 8. Frequently Asked Questions (Technical & Musical)
 
-### Preguntas frecuentes anticipadas con respuestas
+### For Music Producers
 
-#### "¿Por qué no usaste FIR en lugar de IIR para los crossovers?"
+**Q: Why should I care about per-band stereo width?**
+A: Because club sound systems, radios, and smartphones are mono in the low frequencies. If your bass is wide, it will disappear on those systems. With per-band control, you can have centered lows (compatible) and wide highs (impressive).
 
-Los FIR (Filtros de Respuesta al Impulso Finita) tienen fase lineal, lo que elimina la distorsión de fase. Sin embargo, para obtener una pendiente de 24 dB/octava con FIR necesitarías cientos de taps, lo que introduce latencia significativa y alto costo computacional. Los filtros Linkwitz-Riley IIR de 4to orden dan 24 dB/octava con solo 2 etapas Butterworth en cascada por filtro, latencia mínima (fase, no grupo), y bajo costo de CPU.
+**Q: When should I use Mute vs. Solo?**
+A: Mute removes a band to hear how the rest sounds without it. Solo isolates a band to hear exactly what range you're modifying. Use Solo when adjusting width on a band and you want to hear only that band.
 
-El LR4 tiene la propiedad crucial de que la suma del lowpass y highpass es plana en magnitud (0 dB en la frecuencia de cruce), algo que no logran otros filtros IIR como Butterworth (-3 dB en el cruce).
+**Q: What does a correlation value of 0.3 mean?**
+A: The signal has weak stereo correlation — it may sound wide and spacious, but it's at risk of cancellation when summed to mono. Below 0.3, the color turns orange/red as a warning.
 
-#### "¿Por qué FFT de 2048 y no 4096 o 1024?"
+**Q: Does the plugin introduce latency?**
+A: No. All processing is sample-by-sample within the current block. The plugin reports 0 samples latency to the DAW.
 
-2048 es un balance entre:
-- **Resolución frecuencial:** 21.5 Hz/bin a 44.1 kHz (suficiente para ver sub-bajos)
-- **Resolución temporal:** hop de 512 samples = 11.6 ms (suficiente para ver transitorios)
-- **Costo computacional:** La FFT es O(n log n). 4096 sería ~2.2× más cara pero daría ~10.75 Hz/bin
+### For Developers
 
-Para un visualizador, 2048 con 75% overlap es el estándar de facto en plugins comerciales.
+**Q: Why `std::array` and not `std::vector` for the bands?**
+A: The number of bands is fixed (5) and known at compile time. `std::array` guarantees contiguous memory, avoids heap allocation, and allows `constexpr`. For runtime-configurable band count, we'd use `std::vector`.
 
-#### "¿Cómo evitarías el zippering en los crossovers?"
+**Q: Why sample-by-sample processing in the crossovers?**
+A: Because `SmoothedValue` needs to be evaluated on every sample for smooth transitions. If we updated frequency once per block (e.g., 512 samples), abrupt automation changes would produce audible stepping. With sample-by-sample and 50 ms ramps, the transition is imperceptible.
 
-El zippering (ruido de escalones) al cambiar la frecuencia de corte se evita con el `SmoothedValue` de 50 ms. Al actualizar la frecuencia sample a sample, la transición es suave. La clave está en que `updateFrequency()` se llama **en cada sample**, no una vez por bloque.
+**Q: Why is `CrossoverPair` a private nested struct?**
+A: Encapsulation. Nobody outside `MultibandSplitter` needs to know there are 4 filters per crossover. If we switch to FIR or biquads in the future, the change stays isolated within that class.
 
-#### "¿Por qué el gap mínimo de 100 Hz entre crossovers?"
+**Q: Why is the bypass crossfade linear instead of constant-power?**
+A: Linear crossfade has a ~3 dB dip at center, but for bypass this is preferable to a pop. Constant-power crossfade (`out = wet·√mix + dry·√(1-mix)`) would be technically more correct but adds complexity for marginal benefit — bypass is engaged/disengaged occasionally, not used as a continuous crossfade.
 
-Sin un gap mínimo, dos crossovers adyacentes podrían colapsar en la misma frecuencia, haciendo que una banda tenga ancho cero (no pasaría audio). El gap de 100 Hz es arbitrario pero práctico — suficientemente pequeño para no limitar al usuario, suficientemente grande para evitar bandas nulas.
+**Q: Why FFT of 2048 and not 4096 or 1024?**
+A: 2048 is the standard balance in commercial plugins: ~21.5 Hz/bin resolution (sufficient for sub-bass), hop of 512 samples (11.6 ms, sufficient for transients), and manageable O(n log n) cost. 4096 would be 2.2× more expensive for only double the resolution.
 
-También hay una razón perceptual: el oído humano puede distinguir cambios de frecuencia de ~3 Hz en el rango bajo, pero en cruces de banda, 100 Hz es imperceptible como "hueco".
+**Q: How is the audio thread synchronized with the GUI?**
+A: Via `std::atomic<bool> ready` in `AudioAnalyzer`. The audio thread writes a snapshot and sets `ready = true`. The GUI timer (30 Hz) tries to consume the snapshot with `ready.exchange(false)` — a lock-free atomic RMW (Read-Modify-Write) operation safe for real-time use. If no new data is available (analysis is slower than 30 Hz or audio is stopped), the display simply doesn't update.
 
-#### "¿Cómo escalaría el plugin a 8 bandas?"
+**Q: Why does the vectorscope no longer clear when there's no data?**
+A: Previously, `clearScopes()` was called on every timer tick without new data, causing flicker during silences or pauses. Now a `signalHoldCounter` retains the image for 5 frames before fading, eliminating flicker without adding latency.
 
-El diseño está preparado para escalar. Habría que:
-1. Cambiar `numBands` y agregar más `CrossoverPair` y `Band`
-2. La cascada se extiende naturalmente — cada nuevo crossover toma el highpass del anterior
-3. El número de filtros LR4 sería N-1 para N bandas
-4. El costo computacional escala linealmente con las bandas
-
-La limitación principal sería el espacio en la GUI para 8 `BandStrip`.
-
-#### "¿Por qué midGain no está expuesto como parámetro?"
-
-Es una decisión de diseño de v1.0 para mantener la UI simple. La clase `Midside` ya tiene `setMidGain()` implementado. Exponerlo requeriría:
-1. Agregar el parámetro en `createParameters()`
-2. Leerlo en `updateParameters()`
-3. Agregar un slider en `BandStrip`
-
-Es la feature de mayor prioridad en la hoja de ruta.
-
-#### "¿Por qué `CrossoverPair` es una estructura anidada privada?"
-
-Por encapsulación. `CrossoverPair` es un detalle de implementación del `MultibandSplitter` — nadie fuera de esa clase necesita saber que existen 4 filtros por crossover, ni cómo se actualizan. Si en el futuro quisiéramos cambiar la implementación (ej. a filtros FIR o biquads), el cambio estaría completamente aislado dentro de `MultibandSplitter`.
-
-#### "¿Por qué `BandScopeBuffer::pos` es privado con `friend`?"
-
-Para mantener encapsulación: solo `PluginProcessor` puede escribir en `pos`, protegiendo la integridad del buffer circular. El `friend` evita hacer público un setter que nadie más debería llamar. Es un uso legítimo de `friend` (acceso controlado a implementación privada).
-
-#### "¿Cómo se comporta el plugin con buffers de distinto tamaño?"
-
-`prepareToPlay()` configura todos los submódulos con `spec.maximumBlockSize`. Los `bandBuffers` y `dryBuffer` se redimensionan en `prepareToPlay()`. El `processBlock()` itera sobre el tamaño real del buffer recibido (`buffer.getNumSamples()`), no un tamaño fijo. Esto significa que el plugin se adapta a cualquier tamaño de bloque (64, 128, 256, 512, 1024 samples) sin problemas.
-
-#### "¿Hay latencia de fase en los LR4 y cómo se compensa?"
-
-Los filtros Linkwitz-Riley de 4to orden tienen latencia de fase (no cero), pero no latencia de grupo constante. Sin embargo, como el plugin procesa la señal completa dentro del mismo bloque (no hay routing paralelo externo), la fase relativa entre bandas se mantiene coherente — todas las bandas pasan por la misma cantidad de filtros (cada banda pasa por algunos lowpass y highpass, pero la suma reconstruye la fase original).
-
-El plugin reporta 0 samples de latencia al DAW porque no introducimos latencia de grupo en el sentido tradicional — todo el procesamiento es sample a sample dentro del bloque actual.
-
----
-
-## Apéndice: Conceptos clave para mencionar
-
-| Concepto | Dónde mencionarlo | Explicación breve |
-|----------|-------------------|-------------------|
-| **RAII** | `ScopedNoDenormals`, `Attachments` | "Resource Acquisition Is Initialization — el destructor libera automáticamente" |
-| **Composición vs Agregación** | Arquitectura | "El Processor posee sus submódulos (composición), el Editor solo referencia (agregación)" |
-| **Lock-free** | `std::atomic<bool> ready` | "Sincronización entre hilos sin mutex, seguro para tiempo real" |
-| **In-place processing** | `Midside::process()` | "El buffer se modifica directamente — ahorra memoria y copias" |
-| **ODR** | `BandColours.h` con `inline` | "One Definition Rule — las funciones inline en headers no violan ODR" |
-| **Ramp time** | `SmoothedValue::reset()` | "Tiempo que tarda el valor suavizado en ir del valor actual al target" |
-| **Spectral leakage** | Ventana Hann | "Artefactos de discontinuidad en los bordes de la ventana FFT" |
-
----
-
-## Referencias para el presentador
-
-- Para explicar LR4: https://en.wikipedia.org/wiki/Linkwitz%E2%80%93Riley_filter
-- Para explicar Mid/Side: https://en.wikipedia.org/wiki/M/S_stereo
-- Para explicar FFT: https://en.wikipedia.org/wiki/Hann_function
-- API de JUCE: https://docs.juce.com/master/
+**Q: Why did the width range change from 0.0–2.0 to 0–100?**
+A: Usability. A 0–100 slider with default 50 is immediately intuitive (0 = none/center, 50 = midpoint/default, 100 = maximum). The decimal range 0.0–2.0 required the user to know 1.0 = original, 0.5 = half, 2.0 = double. Internally the value converts via `width * 0.02f` to maintain the same effective side gain range (0.0–2.0).
