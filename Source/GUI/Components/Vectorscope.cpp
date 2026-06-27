@@ -74,8 +74,6 @@ void Vectorscope::pushBandScope(int bandIndex, const float* left, const float* r
         bs.side[i] = (l - r) * 0.5f;
     }
 
-    hasSignal = true;
-
     int maxCount = 0;
     for (auto& b : bandScopes)
         if (b.count > maxCount)
@@ -84,12 +82,22 @@ void Vectorscope::pushBandScope(int bandIndex, const float* left, const float* r
     dirtyScope = true;
 }
 
+void Vectorscope::setHasSignal(bool s)
+{
+    if (s)
+        signalHoldCounter = signalHoldFrames;
+    else if (signalHoldCounter > 0)
+        --signalHoldCounter;
+    hasSignal = signalHoldCounter > 0;
+}
+
 void Vectorscope::clearScopes()
 {
     anyScopeCount = 0;
     for (auto& bs : bandScopes)
         bs.count = 0;
     hasSignal = false;
+    signalHoldCounter = 0;
     targetCorrelation = 0.0f;
     dirtyScope = false;
     repaint();
@@ -97,13 +105,15 @@ void Vectorscope::clearScopes()
 
 void Vectorscope::tickSmoothing()
 {
-    auto oldVal = displayCorrelation;
     auto diff = targetCorrelation - displayCorrelation;
     displayCorrelation += diff * 0.12f;
     if (std::abs(diff) < 0.0001f)
         displayCorrelation = targetCorrelation;
-    if (std::abs(displayCorrelation - oldVal) > 0.0005f || dirtyScope)
+
+    auto corrDiff = std::abs(displayCorrelation - lastPaintedCorrelation);
+    if (dirtyScope || corrDiff > 0.02f)
     {
+        lastPaintedCorrelation = displayCorrelation;
         dirtyScope = false;
         repaint();
     }
@@ -234,8 +244,7 @@ void Vectorscope::paint(juce::Graphics& g)
         g.drawVerticalLine(static_cast<int>(x), tickTop, tickBot);
     }
 
-    // Correlation fill (only if signal present)
-    if (hasSignal)
+    // Correlation fill
     {
         auto fillW = (displayCorrelation + 1.0f) * 0.5f * meterBox.getWidth();
         auto fillRect = juce::Rectangle<float>(meterLeft, tickTop, fillW, tickBot - tickTop);
@@ -258,6 +267,8 @@ void Vectorscope::paint(juce::Graphics& g)
                 break;
             }
         }
+        if (!hasSignal)
+            corrColour = corrColour.withAlpha(0.2f);
         g.setColour(corrColour);
         g.fillRoundedRectangle(fillRect, 2.0f);
     }

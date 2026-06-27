@@ -60,8 +60,11 @@ void AudioAnalyzer::computeFFT()
 
     fft.performRealOnlyForwardTransform(fftData.data());
 
+    // Build snapshot locally to minimize shared-memory race window
+    Snapshot local;
+
     // Bin 0 (DC)
-    workingSnapshot.spectrum[0] = juce::Decibels::gainToDecibels(
+    local.spectrum[0] = juce::Decibels::gainToDecibels(
         std::abs(fftData[0]) / static_cast<float>(fftSize), -120.0f);
 
     // Bins 1 to N/2 - 1
@@ -70,28 +73,30 @@ void AudioAnalyzer::computeFFT()
         auto real = fftData[2 * i];
         auto imag = fftData[2 * i + 1];
         auto mag = std::sqrt(real * real + imag * imag) / static_cast<float>(fftSize);
-        workingSnapshot.spectrum[i] = juce::Decibels::gainToDecibels(mag, -120.0f);
+        local.spectrum[i] = juce::Decibels::gainToDecibels(mag, -120.0f);
     }
 
     // Bin N/2 (Nyquist)
-    workingSnapshot.spectrum[numBins - 1] = juce::Decibels::gainToDecibels(
+    local.spectrum[numBins - 1] = juce::Decibels::gainToDecibels(
         std::abs(fftData[1]) / static_cast<float>(fftSize), -120.0f);
 
     auto oldestIdx = (scopeWritePos + 1) % scopeSize;
     for (int i = 0; i < scopeSize; ++i)
     {
         auto idx = (oldestIdx + i) % scopeSize;
-        workingSnapshot.scopeLeft[i] = scopeWriteL[idx];
-        workingSnapshot.scopeRight[i] = scopeWriteR[idx];
+        local.scopeLeft[i] = scopeWriteL[idx];
+        local.scopeRight[i] = scopeWriteR[idx];
     }
-    workingSnapshot.scopeCount = scopeSize;
+    local.scopeCount = scopeSize;
 
-    ready.store(true);
+    // Single struct copy, then signal ready
+    workingSnapshot = local;
+    ready.store(true, std::memory_order_release);
 }
 
 bool AudioAnalyzer::consumeSnapshot(Snapshot& output)
 {
-    if (!ready.exchange(false))
+    if (!ready.exchange(false, std::memory_order_acquire))
         return false;
 
     std::copy(std::begin(workingSnapshot.spectrum), std::end(workingSnapshot.spectrum), output.spectrum);

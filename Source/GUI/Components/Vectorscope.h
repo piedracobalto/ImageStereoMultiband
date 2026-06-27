@@ -12,7 +12,7 @@ public:
     void pushScopeData(const float* left, const float* right, int count);
     void pushBandScope(int bandIndex, const float* left, const float* right, int count);
     void setCorrelation(float corr) { targetCorrelation = corr; }
-    void setHasSignal(bool s) { hasSignal = s; }
+    void setHasSignal(bool s);
     void tickSmoothing();
     void clearScopes();
 
@@ -34,7 +34,7 @@ private:
     std::array<BandScope, numBands> bandScopes;
     int anyScopeCount = 0;
 
-    float zoomFactor = 5.0f;
+    float zoomFactor = 1.5f;
     bool multiColor = false;
     bool dirtyScope = false;
 
@@ -44,5 +44,8 @@ private:
 
     float targetCorrelation = 0.0f;
     float displayCorrelation = 0.0f;
+    float lastPaintedCorrelation = 0.0f;
     bool hasSignal = false;
+    int signalHoldCounter = 0;
+    static constexpr int signalHoldFrames = 5;
 };
