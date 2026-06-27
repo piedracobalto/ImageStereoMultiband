@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <JUCERPROJECT id="IYeeKn" name="ImageStereoMultiband" projectType="audioplug"
+              companyName="Pedro Cuomo Ghio" companyWebsite="" companyEmail=""
               useAppConfig="0" addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1">
   <MAINGROUP id="wdTrkB" name="ImageStereoMultiband">
     <GROUP id="{5C41F0AD-7972-4684-739A-8E549073A363}" name="Source">
