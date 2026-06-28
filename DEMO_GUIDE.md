@@ -48,7 +48,7 @@ Each stage exists for a reason:
 | **Gain per band** | Applies independent volume | Compensate level differences when modifying width |
 | **Mute/Solo** | Silences or isolates bands | Diagnose which frequency range you're modifying |
 | **Sum** | Recombines the 5 bands into stereo output | LR4 guarantees flat sum (0 dB at crossover) |
-| **Bypass** | 50 ms linear crossfade | Prevents pops when enabling/disabling processing |
+| **Bypass** | 50 ms linear crossfade between processed (wet) and dry signal | Prevents pops; passes clean unprocessed signal when engaged. A dark overlay covers the UI and visuals stop updating |
 
 ### Why 5 bands? Isn't that too many?
 
@@ -276,8 +276,8 @@ A: Because `SmoothedValue` needs to be evaluated on every sample for smooth tran
 **Q: Why is `CrossoverPair` a private nested struct?**
 A: Encapsulation. Nobody outside `MultibandSplitter` needs to know there are 4 filters per crossover. If we switch to FIR or biquads in the future, the change stays isolated within that class.
 
-**Q: Why is the bypass crossfade linear instead of constant-power?**
-A: Linear crossfade has a ~3 dB dip at center, but for bypass this is preferable to a pop. Constant-power crossfade (`out = wet·√mix + dry·√(1-mix)`) would be technically more correct but adds complexity for marginal benefit — bypass is engaged/disengaged occasionally, not used as a continuous crossfade.
+**Q: What happens when I engage bypass?**
+R: The plugin stops processing audio and the signal passes through completely clean and unaltered. The 50 ms linear crossfade prevents pops during the transition. All visuals (FFT spectrum, vectorscope) stop updating, and a dark overlay with "BYPASSED" text appears to indicate processing is disabled. The overlay leaves the header bar clickable so you can toggle bypass off again.
 
 **Q: Why FFT of 2048 and not 4096 or 1024?**
 A: 2048 is the standard balance in commercial plugins: ~21.5 Hz/bin resolution (sufficient for sub-bass), hop of 512 samples (11.6 ms, sufficient for transients), and manageable O(n log n) cost. 4096 would be 2.2× more expensive for only double the resolution.

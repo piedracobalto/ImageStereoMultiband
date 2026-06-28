@@ -36,26 +36,22 @@
           <FILE id="c5pzTK" name="Crossover.h" compile="0" resource="0" file="Source/DSP/Crossover/Crossover.h"/>
         </GROUP>
         <GROUP id="{F4A2E1C3-8B7D-4A9C-B5E2-7D3F1A8C9E6B}" name="Analyzer">
-          <FILE id="IMB012" name="AudioAnalyzer.cpp" compile="1" resource="0" file="Source/DSP/Analyzer/AudioAnalyzer.cpp"/>
+          <FILE id="IMB012" name="AudioAnalyzer.cpp" compile="1" resource="0"
+                file="Source/DSP/Analyzer/AudioAnalyzer.cpp"/>
           <FILE id="IMB013" name="AudioAnalyzer.h" compile="0" resource="0" file="Source/DSP/Analyzer/AudioAnalyzer.h"/>
         </GROUP>
       </GROUP>
       <GROUP id="{60B47FB2-BC72-4DC2-A219-49F884715CA4}" name="GUI">
         <GROUP id="{7B817634-95D3-465C-8C23-5F955C3E8E86}" name="Components">
-          <FILE id="IMB001" name="BandStrip.cpp" compile="1" resource="0"
-                file="Source/GUI/Components/BandStrip.cpp"/>
-          <FILE id="IMB002" name="BandStrip.h" compile="0" resource="0"
-                file="Source/GUI/Components/BandStrip.h"/>
-          <FILE id="IMB005" name="HeaderBar.cpp" compile="1" resource="0"
-                file="Source/GUI/Components/HeaderBar.cpp"/>
-          <FILE id="IMB006" name="HeaderBar.h" compile="0" resource="0"
-                file="Source/GUI/Components/HeaderBar.h"/>
-          <FILE id="IMB014" name="Vectorscope.cpp" compile="1" resource="0"
-                file="Source/GUI/Components/Vectorscope.cpp"/>
-          <FILE id="IMB015" name="Vectorscope.h" compile="0" resource="0"
-                file="Source/GUI/Components/Vectorscope.h"/>
-          <FILE id="IMB016" name="SpectrumCrossoverControls.cpp" compile="1" resource="0"
-                file="Source/GUI/Components/SpectrumCrossoverControls.cpp"/>
+          <FILE id="ghmdXR" name="Bypassoverlay.h" compile="0" resource="0" file="Source/GUI/Components/Bypassoverlay.h"/>
+          <FILE id="IMB001" name="BandStrip.cpp" compile="1" resource="0" file="Source/GUI/Components/BandStrip.cpp"/>
+          <FILE id="IMB002" name="BandStrip.h" compile="0" resource="0" file="Source/GUI/Components/BandStrip.h"/>
+          <FILE id="IMB005" name="HeaderBar.cpp" compile="1" resource="0" file="Source/GUI/Components/HeaderBar.cpp"/>
+          <FILE id="IMB006" name="HeaderBar.h" compile="0" resource="0" file="Source/GUI/Components/HeaderBar.h"/>
+          <FILE id="IMB014" name="Vectorscope.cpp" compile="1" resource="0" file="Source/GUI/Components/Vectorscope.cpp"/>
+          <FILE id="IMB015" name="Vectorscope.h" compile="0" resource="0" file="Source/GUI/Components/Vectorscope.h"/>
+          <FILE id="IMB016" name="SpectrumCrossoverControls.cpp" compile="1"
+                resource="0" file="Source/GUI/Components/SpectrumCrossoverControls.cpp"/>
           <FILE id="IMB017" name="SpectrumCrossoverControls.h" compile="0" resource="0"
                 file="Source/GUI/Components/SpectrumCrossoverControls.h"/>
         </GROUP>
@@ -65,8 +61,7 @@
           <FILE id="IMB008" name="PluginLookAndFeel.h" compile="0" resource="0"
                 file="Source/GUI/LookAndFeel/PluginLookAndFeel.h"/>
         </GROUP>
-        <FILE id="IMB011" name="BandColours.h" compile="0" resource="0"
-              file="Source/GUI/BandColours.h"/>
+        <FILE id="IMB011" name="BandColours.h" compile="0" resource="0" file="Source/GUI/BandColours.h"/>
       </GROUP>
       <FILE id="k98Ngl" name="PluginProcessor.cpp" compile="1" resource="0"
             file="Source/PluginProcessor.cpp"/>

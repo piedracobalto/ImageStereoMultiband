@@ -48,7 +48,7 @@ Cada etapa tiene una razón de ser:
 | **Ganancia por banda** | Aplica volumen independiente | Compensar diferencias de nivel al modificar el ancho estéreo |
 | **Mute/Solo** | Silencia o aísla bandas | Diagnosticar qué rango frecuencial estás modificando |
 | **Suma** | Recombina las 5 bandas en una salida estéreo | Los LR4 garantizan suma plana (0 dB en cruce) |
-| **Bypass** | Crossfade lineal de 50 ms | Evita pops al activar/desactivar el procesamiento |
+| **Bypass** | Crossfade lineal de 50 ms entre señal procesada (wet) y original (dry) | Evita pops; al activar pasa la señal limpia sin procesar. Un overlay oscuro cubre la interfaz y los visuales se detienen |
 
 ### ¿Por qué 5 bandas? ¿No son demasiadas?
 
@@ -276,8 +276,8 @@ R: Porque `SmoothedValue` necesita evaluarse en cada sample para producir transi
 **P: ¿Por qué `CrossoverPair` es una estructura privada anidada?**
 R: Encapsulación. Nadie fuera de `MultibandSplitter` necesita saber que existen 4 filtros por crossover. Si en el futuro cambiamos a FIR o biquads, el cambio está aislado dentro de esa clase.
 
-**P: ¿Por qué el crossfade de bypass es lineal y no de potencia constante?**
-R: El crossfade lineal produce una atenuación de ~3 dB en el centro, pero para bypass es preferible a un pop. El crossfade de potencia constante (`out = wet·√mix + dry·√(1-mix)`) sería más correcto técnicamente pero añade complejidad para un beneficio marginal en este contexto — el bypass se activa/desactiva ocasionalmente, no es un crossfade continuo.
+**P: ¿Qué pasa cuando activo el bypass?**
+R: El plugin deja de procesar el audio y la señal pasa limpia, sin ninguna alteración. El crossfade lineal de 50 ms evita pops en la transición. Además, todos los visuales (espectro FFT, vectoscopio) se detienen y aparece un overlay oscuro con el texto "BYPASSED" para indicar que el procesamiento está desactivado. El overlay no cubre el header bar, así que puedes volver a clickear el botón de bypass para desactivarlo.
 
 **P: ¿Por qué FFT de 2048 y no 4096 o 1024?**
 R: 2048 es el balance estándar en plugins comerciales: ~21.5 Hz/bin de resolución (suficiente para sub-bajos), hop de 512 samples (11.6 ms, suficiente para transitorios), y costo computacional O(n log n) manejable. 4096 sería 2.2× más caro con solo el doble de resolución.

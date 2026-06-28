@@ -68,6 +68,7 @@ public:
     juce::AudioProcessorValueTreeState::ParameterLayout createParameters();
     juce::AudioProcessorValueTreeState& getAPVTS();
 
+    bool isBypassed() const { return bypassed; }
     AudioAnalyzer& getAnalyzer() { return analyzer; }
     const std::array<float, 4>& getCrossovers() const { return currentCrossovers; }
     double getCurrentSampleRate() const { return currentSampleRate; }

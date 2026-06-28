@@ -14,7 +14,7 @@ Desarrollado por **Pedro Cuomo Ghio** — Versión **1.0.0**
 - **Mute/Solo** por banda con lógica inteligente
 - **Visualizador FFT** en tiempo real con curva espectral
 - **Vectoscopio Mid/Side** con medidor de correlación de fase
-- **Bypass suave** con crossfade de 50 ms
+- **Bypass suave** con crossfade de 50 ms entre wet y dry (señal limpia al bypassear)
 - **Persistencia de estado** — el DAW guarda y restaura toda la configuración
 
 ---
@@ -119,6 +119,12 @@ Source/
 
 ---
 
+## Captura
+
+![ImageStereoMultiband](Assets/screenshot.png)
+
+---
+
 ## Licencia
 
-Uso educativo y personal. Distribuido como plugin VST3 gratuito.
+Distribuido bajo licencia MIT. Ver [LICENSE](LICENSE) para más detalles.

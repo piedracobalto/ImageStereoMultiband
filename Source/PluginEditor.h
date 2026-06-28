@@ -14,25 +14,22 @@
 #include "GUI/Components/HeaderBar.h"
 #include "GUI/Components/Vectorscope.h"
 #include "GUI/Components/SpectrumCrossoverControls.h"
+#include "GUI/Components/BypassOverlay.h"
 #include "GUI/LookAndFeel/PluginLookAndFeel.h"
 
 //==============================================================================
-/**
-*/
-class ImageStereoMultibandAudioProcessorEditor  : public juce::AudioProcessorEditor,
-                                                  private juce::Timer
+class ImageStereoMultibandAudioProcessorEditor : public juce::AudioProcessorEditor,
+    private juce::Timer
 {
 public:
-    ImageStereoMultibandAudioProcessorEditor (ImageStereoMultibandAudioProcessor&);
+    ImageStereoMultibandAudioProcessorEditor(ImageStereoMultibandAudioProcessor&);
     ~ImageStereoMultibandAudioProcessorEditor() override;
 
-    //==============================================================================
-    void paint (juce::Graphics&) override;
+    void paint(juce::Graphics&) override;
     void resized() override;
 
 private:
     void timerCallback() override;
-
     void updateBandVisibility();
 
     ImageStereoMultibandAudioProcessor& audioProcessor;
@@ -46,5 +43,9 @@ private:
     juce::TextButton addBandBtn{ "+" };
     juce::TextButton removeBandBtn{ "-" };
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ImageStereoMultibandAudioProcessorEditor)
+    // Must be declared last — added as child last in the constructor
+    // so its z-order puts it above everything else.
+    BypassOverlay bypassOverlay;
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ImageStereoMultibandAudioProcessorEditor)
 };

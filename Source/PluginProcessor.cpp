@@ -247,56 +247,58 @@ void ImageStereoMultibandAudioProcessor::processBlock(
     juce::ScopedNoDenormals noDenormals;
 
     updateParameters();
-    splitter.setNumBands(numBands);
 
-    // Guardar señal original
+    // Guardar señal original antes de cualquier procesamiento
     dryBuffer.makeCopyOf(buffer);
 
-    // Procesamiento normal
-    splitter.process(buffer, bandBuffers);
-
-    for (int i = 0; i < numBands; ++i)
-        bands[i].process(bandBuffers[i]);
-
-    applySoloLogic();
-
-    for (int b = 0; b < numBands; ++b)
+    if (!bypassed)
     {
-        auto& buf = bandScopes[static_cast<size_t>(b)];
-        auto& bandBuf = bandBuffers[static_cast<size_t>(b)];
-        auto numSamples = bandBuf.getNumSamples();
-        auto* l = bandBuf.getReadPointer(0);
-        auto* r = bandBuf.getReadPointer(1);
-        for (int s = 0; s < numSamples; ++s)
+        splitter.setNumBands(numBands);
+
+        splitter.process(buffer, bandBuffers);
+
+        for (int i = 0; i < numBands; ++i)
+            bands[i].process(bandBuffers[i]);
+
+        applySoloLogic();
+
+        for (int b = 0; b < numBands; ++b)
         {
-            buf.left[static_cast<size_t>(buf.pos)] = l[s];
-            buf.right[static_cast<size_t>(buf.pos)] = r[s];
-            buf.pos = (buf.pos + 1) % BandScopeBuffer::size;
-            if (buf.count < BandScopeBuffer::size)
-                ++buf.count;
+            auto& buf = bandScopes[static_cast<size_t>(b)];
+            auto& bandBuf = bandBuffers[static_cast<size_t>(b)];
+            auto numSamples = bandBuf.getNumSamples();
+            auto* l = bandBuf.getReadPointer(0);
+            auto* r = bandBuf.getReadPointer(1);
+            for (int s = 0; s < numSamples; ++s)
+            {
+                buf.left[static_cast<size_t>(buf.pos)] = l[s];
+                buf.right[static_cast<size_t>(buf.pos)] = r[s];
+                buf.pos = (buf.pos + 1) % BandScopeBuffer::size;
+                if (buf.count < BandScopeBuffer::size)
+                    ++buf.count;
+            }
         }
+
+        buffer.clear();
+
+        for (int band = 0; band < numBands; ++band)
+        {
+            for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
+            {
+                buffer.addFrom(
+                    ch,
+                    0,
+                    bandBuffers[band],
+                    ch,
+                    0,
+                    buffer.getNumSamples());
+            }
+        }
+
+        analyzer.process(buffer);
     }
 
-    buffer.clear();
-
-    for (int band = 0; band < numBands; ++band)
-    {
-        for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
-        {
-            buffer.addFrom(
-                ch,
-                0,
-                bandBuffers[band],
-                ch,
-                0,
-                buffer.getNumSamples());
-        }
-    }
-
-    // Analizar audio post-procesamiento (antes del bypass para reflejar Width/Gain)
-    analyzer.process(buffer);
-
-    // Crossfade bypass smooth
+    // Bypass: crossfade suave entre procesado (wet) y se�al original (dry)
     for (int sample = 0; sample < buffer.getNumSamples(); ++sample)
     {
         auto mix = bypassMix.getNextValue();
@@ -305,12 +307,7 @@ void ImageStereoMultibandAudioProcessor::processBlock(
         {
             auto wet = buffer.getSample(ch, sample);
             auto dry = dryBuffer.getSample(ch, sample);
-
-            buffer.setSample(
-                ch,
-                sample,
-                wet * mix +
-                dry * (1.0f - mix));
+            buffer.setSample(ch, sample, dry + (wet - dry) * mix);
         }
     }
 
