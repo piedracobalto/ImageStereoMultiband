@@ -1,0 +1,22 @@
+# Build artifacts
+*.exe
+*.dll
+*.vst3
+*.lib
+*.pdb
+*.exp
+*.ilk
+*.obj
+*.iobj
+*.ipdb
+*.tlb
+*.tlh
+
+# Installer output
+ImageStereoMultiband_Installer.exe
+
+# IDE/editor files
+.vs/
+*.suo
+*.user
+*.sln.docstates
