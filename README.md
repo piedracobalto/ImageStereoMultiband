@@ -1,130 +1,130 @@
 # ImageStereoMultiband
 
-**Plugin VST3 de procesamiento estéreo multibanda** — Divide la señal de audio en 5 bandas de frecuencia con control independiente de ancho estéreo, ganancia, mute y solo.
+**Multiband stereo processing VST3 plugin** — Splits the audio signal into 5 frequency bands with independent stereo width, gain, mute, and solo control.
 
-Desarrollado por **Pedro Cuomo Ghio** — Versión **1.0.0**
-
----
-
-## Características
-
-- **5 bandas de frecuencia** con cruces configurables (120, 500, 2000, 8000 Hz por defecto)
-- **Control de ancho estéreo** por banda (procesamiento Mid/Side)
-- **Ganancia independiente** por banda (-24 dB a +24 dB)
-- **Mute/Solo** por banda con lógica inteligente
-- **Visualizador FFT** en tiempo real con curva espectral
-- **Vectoscopio Mid/Side** con medidor de correlación de fase
-- **Bypass suave** con crossfade de 50 ms entre wet y dry (señal limpia al bypassear)
-- **Persistencia de estado** — el DAW guarda y restaura toda la configuración
+Developed by **Pedro Cuomo Ghio** — Version **1.0.0**
 
 ---
 
-## Instalación
+## Features
 
-### Usuarios
+- **5 frequency bands** with configurable crossover points (120, 500, 2000, 8000 Hz default)
+- **Per-band stereo width** control (Mid/Side processing)
+- **Independent gain** per band (-24 dB to +24 dB)
+- **Mute/Solo** per band with intelligent solo logic
+- **Real-time FFT spectrum** analyzer
+- **Mid/Side vectorscope** with phase correlation meter
+- **Smooth bypass** with 50 ms wet/dry crossfade (clean signal when bypassed)
+- **State persistence** — the DAW saves and restores all settings
 
-1. Descarga `ImageStereoMultiband_Installer.exe`
-2. Ejecuta como administrador
-3. El instalador coloca el plugin en:
+---
+
+## Installation
+
+### Users
+
+1. Download `ImageStereoMultiband_Installer.exe`
+2. Run as administrator
+3. The installer places the plugin at:
    ```
    C:\Program Files\Common Files\VST3\ImageStereoMultiband.vst3\
    ```
-4. Escanea la carpeta VST3 desde tu DAW (Cubase, Reaper, FL Studio, Studio One, etc.)
+4. Scan the VST3 folder from your DAW (Cubase, Reaper, FL Studio, Studio One, etc.)
 
-### Desarrolladores — Compilar desde fuente
+### Developers — Building from Source
 
-#### Requisitos
+#### Requirements
 
-- **Visual Studio 2026** (o compatible con proyectos VC++ v143)
-- **JUCE 8.0.12** — ubicado en `../../juce-8.0.12-windows/JUCE/` relativo al proyecto
-- **Inno Setup 6** (opcional, para generar instalador)
+- **Visual Studio 2026** (or compatible with VC++ v143 toolset)
+- **JUCE 8.0.12** — located at `../../juce-8.0.12-windows/JUCE/` relative to the project
+- **Inno Setup 6** (optional, for building the installer)
 
-#### Pasos
+#### Steps
 
 ```bash
-# 1. Abrir la solución
+# 1. Open the solution
 Builds/VisualStudio2026/ImageStereoMultiband.sln
 
-# 2. Seleccionar configuración Release, plataforma x64
-# 3. Compilar → genera:
+# 2. Select Release configuration, x64 platform
+# 3. Build → generates:
 #    - VST3: x64/Release/VST3/ImageStereoMultiband.vst3/
 #    - Standalone: x64/Release/Standalone Plugin/ImageStereoMultiband.exe
 
-# 4. (Opcional) Generar instalador
+# 4. (Optional) Build installer
 & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
 ```
 
 ---
 
-## Guía de uso
+## Usage Guide
 
-### Panel de control por banda
+### Per-band Control Panel
 
-Cada banda tiene cuatro controles:
+Each band has four controls:
 
-| Control | Tipo | Descripción |
+| Control | Type | Description |
 |---------|------|-------------|
-| **Width** | Slider horizontal | Ancho estéreo (0 = mid/mono, 50 = original, 100 = side). Muestra valor al pasar el ratón; doble click para editar |
-| **Gain** | Slider vertical | Ganancia de -24 dB a +24 dB. Valor editable con doble click |
-| **M** | Botón | Silencia la banda |
-| **S** | Botón | Aísla la banda (solo) |
+| **Width** | Horizontal slider | Stereo width (0 = mid/mono, 50 = original, 100 = max side). Shows value on hover; double-click to edit |
+| **Gain** | Vertical slider | Gain from -24 dB to +24 dB. Double-click to edit |
+| **M** | Button | Mutes the band |
+| **S** | Button | Solos the band |
 
-### Espectro y cruces
+### Spectrum & Crossovers
 
-El panel superior muestra el **espectro de frecuencia** en tiempo real. Las líneas verticales con indicador cuadrado son las **frecuencias de cruce** entre bandas. Puedes arrastrarlas con el ratón o hacer doble click sobre el valor numérico para editarlo — los cruces adyacentes mantienen un gap mínimo de 100 Hz.
+The top panel shows the **FFT spectrum** in real time. The vertical lines with square handles are the **crossover frequencies** between bands. Drag them with the mouse or double-click the numeric label to edit — adjacent crossovers maintain a minimum 100 Hz gap.
 
-### Vectoscopio
+### Vectorscope
 
-Visualiza la imagen estéreo en espacio **Mid/Side**:
+Visualizes the stereo image in **Mid/Side** space:
 
-- **Eje Y** = Mid (mono), **Eje X** = Side (estéreo)
-- Señal mono → puntos en vertical
-- Señal estéreo balanceada → círculo
-- Señal out-of-phase → puntos fuera del círculo de referencia
+- **Y axis** = Mid (mono), **X axis** = Side (stereo)
+- Mono signal → vertical dots
+- Balanced stereo → circle
+- Out-of-phase signal → dots outside the reference circle
 
-Botones: **+/-** para zoom, **W/C** para alternar entre blanco y colores por banda. La banda muteada o sin solo (cuando hay otro solo activo) se atenúa al 5% de opacidad. Botones **−** (remove) y **+** (add) en el panel inferior permiten añadir/quitar bandas en tiempo real.
+Controls: **+/-** for zoom, **W/C** to toggle between white and per-band colors. Muted or non-soloed bands (when another solo is active) are dimmed to 5% opacity. **−** (remove) and **+** (add) buttons let you add/remove bands in real time.
 
-El medidor inferior muestra la **correlación de fase** (-1 a +1):
-- Verde > 0.7 — Bien correlacionado
-- Amarillo 0.3–0.7 — Parcialmente correlacionado
-- Naranja -0.3–0.3 — No correlacionado / ancho
-- Rojo < -0.3 — Fuera de fase (puede causar cancelación al sumar a mono)
+The bottom meter shows **phase correlation** (-1 to +1):
+- Green > 0.7 — Well correlated
+- Yellow 0.3–0.7 — Partially correlated
+- Orange -0.3–0.3 — Uncorrelated / wide
+- Red < -0.3 — Out of phase (may cancel when summed to mono)
 
 ---
 
-## Estructura del proyecto
+## Project Structure
 
 ```
 Source/
-├── PluginProcessor.h/.cpp     → Procesamiento de audio (entrada del DAW)
-├── PluginEditor.h/.cpp        → Interfaz gráfica (timer + layout)
-├── Parameters/                → [stubs] IDs y layout de parámetros
+├── PluginProcessor.h/.cpp     → Audio processing (DAW entry point)
+├── PluginEditor.h/.cpp        → Graphical interface (timer + layout)
+├── Parameters/                → [stubs] Parameter IDs and layout
 ├── DSP/
-│   ├── MultibandSplitter/     → Divide en 5 bandas (filtros LR4 en cascada)
-│   ├── Band/                  → Procesamiento de una banda (MidSide + Gain)
-│   ├── Midside/               → Codificación/decodificación Mid/Side
-│   ├── Crossover/             → Par de filtros Linkwitz-Riley 4to orden
-│   ├── Analyzer/              → FFT 2048 + osciloscopio en tiempo real
-│   ├── Gain/                  → [stub] Sin implementar
-│   └── DryWet/                → [stub] Sin implementar
+│   ├── MultibandSplitter/     → Splits into 5 bands (cascaded LR4 filters)
+│   ├── Band/                  → Single band processing (MidSide + Gain)
+│   ├── Midside/               → Mid/Side encoding/decoding
+│   ├── Crossover/             → 4th-order Linkwitz-Riley filter pair
+│   ├── Analyzer/              → FFT 2048 + real-time oscilloscope
+│   ├── Gain/                  → [stub] Not implemented
+│   └── DryWet/                → [stub] Not implemented
 └── GUI/
-    ├── LookAndFeel/           → Tema oscuro + rotary slider personalizado
+    ├── LookAndFeel/           → Dark theme + custom rotary slider
     ├── Components/
-    │   ├── HeaderBar/         → Título + botón de bypass
-    │   ├── BandStrip/         → Controles por banda
-    │   ├── SpectrumCrossoverControls/ → Espectro + handles de cruce
-    │   └── Vectorscope/       → Visualizador Mid/Side + correlación
-    └── BandColours.h          → Paleta de colores (5 bandas)
+    │   ├── HeaderBar/         → Title + bypass button
+    │   ├── BandStrip/         → Per-band controls
+    │   ├── SpectrumCrossoverControls/ → Spectrum + crossover handles
+    │   └── Vectorscope/       → Mid/Side visualizer + correlation
+    └── BandColours.h          → Color palette (5 bands)
 ```
 
 ---
 
-## Captura
+## Screenshot
 
 ![ImageStereoMultiband](Assets/screenshot.png)
 
 ---
 
-## Licencia
+## License
 
-Distribuido bajo licencia MIT. Ver [LICENSE](LICENSE) para más detalles.
+Distributed under the MIT License. See [LICENSE](LICENSE) for details.
