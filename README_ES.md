@@ -23,6 +23,8 @@ Desarrollado por **Pedro Cuomo Ghio** — Versión **1.0.0**
 
 ### Usuarios
 
+**Windows**
+
 1. Descarga `ImageStereoMultiband_Installer.exe`
 2. Ejecuta como administrador
 3. El instalador coloca el plugin en:
@@ -30,6 +32,12 @@ Desarrollado por **Pedro Cuomo Ghio** — Versión **1.0.0**
    C:\Program Files\Common Files\VST3\ImageStereoMultiband.vst3\
    ```
 4. Escanea la carpeta VST3 desde tu DAW (Cubase, Reaper, FL Studio, Studio One, etc.)
+
+**macOS**
+
+1. Descarga `ImageStereoMultiband.dmg`
+2. Abre el DMG y ejecuta el paquete instalador
+3. Consulta [HowToInstall.txt](HowToInstall.txt) para instrucciones detalladas
 
 ### Desarrolladores — Compilar desde fuente
 

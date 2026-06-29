@@ -1,0 +1,49 @@
+How to Install ImageStereoMultiband on macOS
+
+1. Open the installer image
+
+   Double-click the ImageStereoMultiband.dmg file. macOS will mount it as a
+   disk image and open a new Finder window.
+
+2. Run the installer package
+
+   In the mounted image, double-click the ImageStereoMultiband installer package
+   file. Follow the on-screen instructions in the macOS Installer.
+
+   You may be asked to enter an administrator password because audio plugins are
+   normally installed in system-wide plugin folders.
+
+3. Installed plugin locations
+
+   Depending on the contents selected in the installer, ImageStereoMultiband may
+   be installed in these standard macOS locations:
+
+   VST3:
+   /Library/Audio/Plug-Ins/VST3/ImageStereoMultiband.vst3
+
+   Audio Unit:
+   /Library/Audio/Plug-Ins/Components/ImageStereoMultiband.component
+
+   Standalone application, if included:
+   /Applications/ImageStereoMultiband.app
+
+4. Restart or rescan your DAW
+
+   After installation, restart your DAW or run its plugin rescan command.
+   Some hosts do not show newly installed plugins until the next launch or scan.
+
+   Logic Pro and GarageBand use the Audio Unit version.
+   Ableton Live, Cubase, Reaper, Studio One, and other hosts may use the VST3
+   version, depending on your DAW settings.
+
+5. If the plugin does not appear
+
+   - Confirm that the plugin exists in one of the install locations above.
+   - Make sure your DAW supports the installed plugin format.
+   - Run the DAW plugin rescan again.
+   - Restart the Mac if the host still does not detect the plugin.
+
+6. Uninstalling
+
+   To remove ImageStereoMultiband manually, delete the installed plugin files
+   from the locations listed above, then restart or rescan your DAW.

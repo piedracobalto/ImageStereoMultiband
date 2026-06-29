@@ -112,7 +112,8 @@ ImageStereoMultiband/
 ├── DOCUMENTATION.md                     ← Spanish technical docs
 ├── DOCUMENTATION_EN.md                  ← English technical docs (this file)
 ├── installer.iss                        ← Inno Setup script
-├── ImageStereoMultiband_Installer.exe   ← Compiled installer
+├── ImageStereoMultiband_Installer.exe   ← Compiled installer (Windows)
+├── ImageStereoMultiband.dmg             ← Disk image installer (macOS)
 │
 ├── Source/                              ← SOURCE CODE
 │   │
