@@ -13,7 +13,6 @@
 ImageStereoMultibandAudioProcessorEditor::ImageStereoMultibandAudioProcessorEditor (ImageStereoMultibandAudioProcessor& p)
     : AudioProcessorEditor (&p),
       audioProcessor (p),
-      headerBar(audioProcessor.getAPVTS()),
       spectrumCrossoverControls(audioProcessor.getAPVTS())
 {
     setLookAndFeel(&lookAndFeel);
@@ -55,10 +54,6 @@ ImageStereoMultibandAudioProcessorEditor::ImageStereoMultibandAudioProcessorEdit
     };
     addAndMakeVisible(addBandBtn);
     addAndMakeVisible(removeBandBtn);
-
-    // Overlay de bypass al final para que quede encima de todo
-    addAndMakeVisible(bypassOverlay);
-    bypassOverlay.setVisible(false);
 
     setSize (980, 720);
     startTimerHz(30);
@@ -118,23 +113,10 @@ void ImageStereoMultibandAudioProcessorEditor::resized()
         bandStrips[i]->setVisible(false);
 
     updateBandVisibility();
-
-    auto overlayArea = getLocalBounds();
-    overlayArea.removeFromTop(50); // Dejar el header bar clickeable
-    bypassOverlay.setBounds(overlayArea);
 }
 
 void ImageStereoMultibandAudioProcessorEditor::timerCallback()
 {
-    bypassOverlay.setVisible(audioProcessor.isBypassed());
-
-    if (audioProcessor.isBypassed())
-    {
-        vectorscope.setHasSignal(false);
-        vectorscope.tickSmoothing();
-        return;
-    }
-
     AudioAnalyzer::Snapshot snap;
     if (audioProcessor.getAnalyzer().consumeSnapshot(snap))
     {

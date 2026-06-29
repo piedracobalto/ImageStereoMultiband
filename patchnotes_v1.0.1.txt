@@ -1,0 +1,21 @@
+v1.0.1 — Splitter Frequency Fix
+===============================
+
+Bug: Al tocar el primer splitter (crossover) en la GUI, la frecuencia saltaba a 20000 Hz
+en lugar de mantenerse donde se posicionaba.
+
+Causa raíz: En JUCE 8, ParameterAdapter::parameterValueChanged() convierte el valor a
+nativo (denormalise) antes de invocar Listener::parameterChanged(). El callback recibía
+el valor en Hz pero el código llamaba convertFrom0to1() sobre ese valor ya nativo,
+tratando 116.8 Hz como normalized 0-1 → clamp a 1.0 → convertFrom0to1(1.0) = 20000 Hz.
+
+Archivos modificados:
+- Source/GUI/Components/SpectrumCrossoverControls.cpp
+
+  a) parameterChanged(): guarda newValue directamente en frequencies[] sin convertFrom0to1().
+  b) setCrossoverFrequency(): escribe directo al raw parameter pointer via getRawParameterValue()
+     (que en JUCE 8 retorna el valor denormalizado/nativo), eliminando el uso de
+     beginChangeGesture()/setValueNotifyingHost()/endChangeGesture() y convertTo0to1().
+
+Testing: Arrastrar cualquier splitter en la GUI debe mantener la frecuencia exacta
+seleccionada sin saltos.

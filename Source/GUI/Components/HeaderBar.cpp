@@ -1,15 +1,12 @@
 #include "HeaderBar.h"
 
-HeaderBar::HeaderBar(juce::AudioProcessorValueTreeState& apvts)
+HeaderBar::HeaderBar()
 {
     titleLabel.setText("Image Stereo Multiband", juce::dontSendNotification);
     titleLabel.setJustificationType(juce::Justification::centredLeft);
     titleLabel.setColour(juce::Label::textColourId, juce::Colours::white);
     titleLabel.setFont(juce::FontOptions(22.0f, juce::Font::bold));
     addAndMakeVisible(titleLabel);
-
-    addAndMakeVisible(bypassButton);
-    bypassAttachment = std::make_unique<ButtonAttachment>(apvts, "bypass", bypassButton);
 }
 
 void HeaderBar::paint(juce::Graphics& g)
@@ -25,6 +22,5 @@ void HeaderBar::paint(juce::Graphics& g)
 void HeaderBar::resized()
 {
     auto area = getLocalBounds().reduced(16, 8);
-    bypassButton.setBounds(area.removeFromRight(96));
     titleLabel.setBounds(area);
 }

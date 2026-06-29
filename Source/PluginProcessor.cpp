@@ -90,12 +90,6 @@ ImageStereoMultibandAudioProcessor::createParameters()
                 defaultCrossovers[i]));
     }
 
-    params.push_back(
-        std::make_unique<juce::AudioParameterBool>(
-            "bypass",
-            "Bypass",
-            false));
-
     return { params.begin(), params.end() };
 }
 
@@ -189,13 +183,6 @@ void ImageStereoMultibandAudioProcessor::prepareToPlay(
 
     analyzer.prepare(sampleRate, samplesPerBlock);
     currentSampleRate = sampleRate;
-
-    bypassMix.reset(sampleRate, 0.05); // 50 ms
-    bypassMix.setCurrentAndTargetValue(1.0f);
-
-    dryBuffer.setSize(
-        getTotalNumOutputChannels(),
-        samplesPerBlock);
 }
 
 void ImageStereoMultibandAudioProcessor::releaseResources()
@@ -248,70 +235,49 @@ void ImageStereoMultibandAudioProcessor::processBlock(
 
     updateParameters();
 
-    // Guardar señal original antes de cualquier procesamiento
-    dryBuffer.makeCopyOf(buffer);
+    splitter.setNumBands(numBands);
 
-    if (!bypassed)
+    splitter.process(buffer, bandBuffers);
+
+    applySoloLogic();
+
+    for (int i = 0; i < numBands; ++i)
+        bands[i].process(bandBuffers[i]);
+
+    for (int b = 0; b < numBands; ++b)
     {
-        splitter.setNumBands(numBands);
-
-        splitter.process(buffer, bandBuffers);
-
-        for (int i = 0; i < numBands; ++i)
-            bands[i].process(bandBuffers[i]);
-
-        applySoloLogic();
-
-        for (int b = 0; b < numBands; ++b)
+        auto& buf = bandScopes[static_cast<size_t>(b)];
+        auto& bandBuf = bandBuffers[static_cast<size_t>(b)];
+        auto numSamples = bandBuf.getNumSamples();
+        auto* l = bandBuf.getReadPointer(0);
+        auto* r = bandBuf.getReadPointer(1);
+        for (int s = 0; s < numSamples; ++s)
         {
-            auto& buf = bandScopes[static_cast<size_t>(b)];
-            auto& bandBuf = bandBuffers[static_cast<size_t>(b)];
-            auto numSamples = bandBuf.getNumSamples();
-            auto* l = bandBuf.getReadPointer(0);
-            auto* r = bandBuf.getReadPointer(1);
-            for (int s = 0; s < numSamples; ++s)
-            {
-                buf.left[static_cast<size_t>(buf.pos)] = l[s];
-                buf.right[static_cast<size_t>(buf.pos)] = r[s];
-                buf.pos = (buf.pos + 1) % BandScopeBuffer::size;
-                if (buf.count < BandScopeBuffer::size)
-                    ++buf.count;
-            }
+            buf.left[static_cast<size_t>(buf.pos)] = l[s];
+            buf.right[static_cast<size_t>(buf.pos)] = r[s];
+            buf.pos = (buf.pos + 1) % BandScopeBuffer::size;
+            if (buf.count < BandScopeBuffer::size)
+                ++buf.count;
         }
-
-        buffer.clear();
-
-        for (int band = 0; band < numBands; ++band)
-        {
-            for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
-            {
-                buffer.addFrom(
-                    ch,
-                    0,
-                    bandBuffers[band],
-                    ch,
-                    0,
-                    buffer.getNumSamples());
-            }
-        }
-
-        analyzer.process(buffer);
     }
 
-    // Bypass: crossfade suave entre procesado (wet) y se�al original (dry)
-    for (int sample = 0; sample < buffer.getNumSamples(); ++sample)
-    {
-        auto mix = bypassMix.getNextValue();
+    buffer.clear();
 
+    for (int band = 0; band < numBands; ++band)
+    {
         for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
         {
-            auto wet = buffer.getSample(ch, sample);
-            auto dry = dryBuffer.getSample(ch, sample);
-            buffer.setSample(ch, sample, dry + (wet - dry) * mix);
+            buffer.addFrom(
+                ch,
+                0,
+                bandBuffers[band],
+                ch,
+                0,
+                buffer.getNumSamples());
         }
     }
 
-
+    analyzer.process(buffer);
 }
 
 //==============================================================================
@@ -357,10 +323,6 @@ void ImageStereoMultibandAudioProcessor::updateParameters()
             splitter.setFrequency(i, freq);
         }
     }
-
-
-    setBypassed(
-        apvts.getRawParameterValue("bypass")->load() > 0.5f);
 }
 
 //==============================================================================
@@ -464,13 +426,4 @@ void ImageStereoMultibandAudioProcessor::setNumBands(int n)
     splitter.setNumBands(numBands);
 }
 
-void ImageStereoMultibandAudioProcessor::setBypassed(bool shouldBypass)
-{
-    if (bypassed == shouldBypass)
-        return;
 
-    bypassed = shouldBypass;
-
-    bypassMix.setTargetValue(
-        shouldBypass ? 0.0f : 1.0f);
-}

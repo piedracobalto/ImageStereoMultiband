@@ -14,7 +14,6 @@
 #include "GUI/Components/HeaderBar.h"
 #include "GUI/Components/Vectorscope.h"
 #include "GUI/Components/SpectrumCrossoverControls.h"
-#include "GUI/Components/BypassOverlay.h"
 #include "GUI/LookAndFeel/PluginLookAndFeel.h"
 
 //==============================================================================
@@ -42,10 +41,6 @@ private:
 
     juce::TextButton addBandBtn{ "+" };
     juce::TextButton removeBandBtn{ "-" };
-
-    // Must be declared last — added as child last in the constructor
-    // so its z-order puts it above everything else.
-    BypassOverlay bypassOverlay;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ImageStereoMultibandAudioProcessorEditor)
 };

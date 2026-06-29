@@ -343,7 +343,8 @@ void SpectrumCrossoverControls::parameterChanged(const juce::String& parameterID
     {
         if (parameterIDs[i] == parameterID)
         {
-            frequencies[i].store(newValue);
+            if (auto* param = valueTreeState.getParameter(parameterIDs[static_cast<size_t>(i)]))
+                frequencies[static_cast<size_t>(i)].store(param->convertFrom0to1(newValue));
             triggerAsyncUpdate();
             return;
         }
@@ -409,13 +410,8 @@ void SpectrumCrossoverControls::setCrossoverFrequency(int index, float frequency
     const auto constrainedFrequency = getConstrainedFrequency(index, frequency);
     frequencies[static_cast<size_t>(index)].store(constrainedFrequency);
 
-    // Update via RawParameterValue (thread-safe, no processor pointer needed)
     if (auto* value = valueTreeState.getRawParameterValue(parameterIDs[static_cast<size_t>(index)]))
-    {
-        auto* param = valueTreeState.getParameter(parameterIDs[static_cast<size_t>(index)]);
-        if (param != nullptr)
-            *value = param->convertTo0to1(constrainedFrequency);
-    }
+        *value = constrainedFrequency;
     repaint();
 }
 

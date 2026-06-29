@@ -68,7 +68,6 @@ public:
     juce::AudioProcessorValueTreeState::ParameterLayout createParameters();
     juce::AudioProcessorValueTreeState& getAPVTS();
 
-    bool isBypassed() const { return bypassed; }
     AudioAnalyzer& getAnalyzer() { return analyzer; }
     const std::array<float, 4>& getCrossovers() const { return currentCrossovers; }
     double getCurrentSampleRate() const { return currentSampleRate; }
@@ -108,13 +107,6 @@ private:
 
     //==========================================================================
     MultibandSplitter splitter;
-    juce::SmoothedValue<float> bypassMix;
-
-    juce::AudioBuffer<float> dryBuffer;
-
-    bool bypassed = false;
-
-    void setBypassed(bool shouldBypass);
 
     static constexpr int maxNumBands = 5;
 
