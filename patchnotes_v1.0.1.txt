@@ -1,40 +1,39 @@
-v1.0.1 — Splitter Frequency Fix + Bypass Global
+v1.0.1 — Splitter Frequency Fix + Global Bypass
 ================================================
 
 Splitter Frequency Fix
 ----------------------
-Bug: Al tocar el primer splitter (crossover) en la GUI, la frecuencia saltaba a 20000 Hz
-en lugar de mantenerse donde se posicionaba.
+Bug: When dragging the first crossover splitter in the GUI, the frequency jumped to 20000 Hz
+instead of staying at the selected position.
 
-Causa raíz: En JUCE 8, ParameterAdapter::parameterValueChanged() convierte el valor a
-nativo (denormalise) antes de invocar Listener::parameterChanged(). El callback recibía
-el valor en Hz pero el código llamaba convertFrom0to1() sobre ese valor ya nativo,
-tratando 116.8 Hz como normalized 0-1 → clamp a 1.0 → convertFrom0to1(1.0) = 20000 Hz.
+Root cause: In JUCE 8, ParameterAdapter::parameterValueChanged() converts the value to
+native (denormalise) before invoking Listener::parameterChanged(). The callback received
+the value in Hz but the code called convertFrom0to1() on the already-native value,
+treating 116.8 Hz as normalized 0-1 → clamp to 1.0 → convertFrom0to1(1.0) = 20000 Hz.
 
-Archivos modificados:
+Modified files:
 - Source/GUI/Components/SpectrumCrossoverControls.cpp
 
-  a) parameterChanged(): guarda newValue directamente en frequencies[] sin convertFrom0to1().
-  b) setCrossoverFrequency(): escribe directo al raw parameter pointer via getRawParameterValue()
-     (que en JUCE 8 retorna el valor denormalizado/nativo), eliminando el uso de
-     beginChangeGesture()/setValueNotifyingHost()/endChangeGesture() y convertTo0to1().
+  a) parameterChanged(): stores newValue directly in frequencies[] without convertFrom0to1().
+  b) setCrossoverFrequency(): writes directly to the raw parameter pointer via getRawParameterValue()
+     (which in JUCE 8 returns the denormalized/native value), removing the use of
+     beginChangeGesture()/setValueNotifyingHost()/endChangeGesture() and convertTo0to1().
 
-Testing: Arrastrar cualquier splitter en la GUI debe mantener la frecuencia exacta
-seleccionada sin saltos.
+Testing: Dragging any splitter in the GUI should keep the exact frequency selected without jumps.
 
-Bypass Global
+Global Bypass
 -------------
-Nuevo: Botón de bypass global en la esquina superior derecha del header.
+New: Global bypass button at the top-right corner of the header bar.
 
-- Al activar el bypass, el buffer de audio pasa limpio sin ningún procesamiento.
-- Un overlay negro semitransparente cubre toda la UI (excepto el header) con texto
-  "BYPASSED" centrado, y los controles quedan deshabilitados (no reciben clicks).
-- Al desactivar el bypass, se resetean los filtros IIR del splitter para evitar
-  artefactos/pops por estado stale (resetDSP).
-- El spectrum analyzer y vectorscope no se ejecutan cuando el plugin está bypassado,
-  ahorrando CPU y evitando gráficas congeladas.
+- When bypass is enabled, the audio buffer passes through clean with no processing.
+- A semi-transparent black overlay covers the entire UI (except the header) with centered
+  "BYPASSED" text, and all controls are disabled (no clicks received).
+- When bypass is disabled, the splitter IIR filters are reset to prevent artifacts/pops
+  from stale DSP state (resetDSP).
+- The spectrum analyzer and vectorscope are not executed when the plugin is bypassed,
+  saving CPU and preventing frozen displays.
 
-Archivos modificados:
+Modified files:
 - Source/PluginProcessor.h
 - Source/PluginProcessor.cpp
 - Source/PluginEditor.h
