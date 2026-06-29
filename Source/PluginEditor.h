@@ -14,6 +14,7 @@
 #include "GUI/Components/HeaderBar.h"
 #include "GUI/Components/Vectorscope.h"
 #include "GUI/Components/SpectrumCrossoverControls.h"
+#include "GUI/Components/Bypassoverlay.h"
 #include "GUI/LookAndFeel/PluginLookAndFeel.h"
 
 //==============================================================================
@@ -35,12 +36,15 @@ private:
 
     PluginLookAndFeel lookAndFeel;
     HeaderBar headerBar;
+    BypassOverlay bypassOverlay;
     Vectorscope vectorscope;
     SpectrumCrossoverControls spectrumCrossoverControls;
     std::array<std::unique_ptr<BandStrip>, 5> bandStrips;
 
     juce::TextButton addBandBtn{ "+" };
     juce::TextButton removeBandBtn{ "-" };
+    juce::ToggleButton bypassButton{ "Bypass" };
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> bypassAttachment;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ImageStereoMultibandAudioProcessorEditor)
 };

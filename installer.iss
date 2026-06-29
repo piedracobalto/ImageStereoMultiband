@@ -1,6 +1,6 @@
 [Setup]
 AppName=ImageStereoMultiband
-AppVersion=1.0.0
+AppVersion=1.0.1
 AppPublisher=Pedro Cuomo Ghio
 AppComments=Plugin VST3 de procesamiento estéreo multibanda
 DefaultGroupName=ImageStereoMultiband

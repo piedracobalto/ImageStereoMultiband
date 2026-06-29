@@ -55,6 +55,17 @@ ImageStereoMultibandAudioProcessorEditor::ImageStereoMultibandAudioProcessorEdit
     addAndMakeVisible(addBandBtn);
     addAndMakeVisible(removeBandBtn);
 
+    bypassButton.setColour(juce::ToggleButton::textColourId, juce::Colour(0xff8a9ba8));
+    bypassButton.setColour(juce::ToggleButton::tickColourId, juce::Colours::transparentBlack);
+    bypassButton.setClickingTogglesState(true);
+    addAndMakeVisible(bypassButton);
+
+    bypassAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
+        audioProcessor.getAPVTS(), "bypass", bypassButton);
+
+    addAndMakeVisible(bypassOverlay);
+    bypassOverlay.setVisible(audioProcessor.isBypassed());
+
     setSize (980, 720);
     startTimerHz(30);
 }
@@ -77,7 +88,14 @@ void ImageStereoMultibandAudioProcessorEditor::resized()
 {
     auto area = getLocalBounds();
 
-    headerBar.setBounds(area.removeFromTop(50));
+    auto headerArea = area.removeFromTop(50);
+    headerBar.setBounds(headerArea);
+
+    // Bypass button: top-right of header
+    bypassButton.setBounds(headerArea.removeFromRight(80).reduced(4, 10));
+
+    // Bypass overlay covers everything below the header
+    bypassOverlay.setBounds(area);
 
     auto content = area.reduced(12, 8);
 
@@ -117,6 +135,14 @@ void ImageStereoMultibandAudioProcessorEditor::resized()
 
 void ImageStereoMultibandAudioProcessorEditor::timerCallback()
 {
+    bypassOverlay.setVisible(audioProcessor.isBypassed());
+
+    if (audioProcessor.isBypassed())
+    {
+        vectorscope.setHasSignal(false);
+        return;
+    }
+
     AudioAnalyzer::Snapshot snap;
     if (audioProcessor.getAnalyzer().consumeSnapshot(snap))
     {

@@ -6,6 +6,7 @@ class MultibandSplitter
 {
 public:
     void prepare(const juce::dsp::ProcessSpec& spec);
+    void reset();
 
     void setFrequency(int index, float frequency);
 

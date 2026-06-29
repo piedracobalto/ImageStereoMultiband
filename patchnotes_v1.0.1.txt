@@ -1,6 +1,8 @@
-v1.0.1 — Splitter Frequency Fix
-===============================
+v1.0.1 — Splitter Frequency Fix + Bypass Global
+================================================
 
+Splitter Frequency Fix
+----------------------
 Bug: Al tocar el primer splitter (crossover) en la GUI, la frecuencia saltaba a 20000 Hz
 en lugar de mantenerse donde se posicionaba.
 
@@ -19,3 +21,23 @@ Archivos modificados:
 
 Testing: Arrastrar cualquier splitter en la GUI debe mantener la frecuencia exacta
 seleccionada sin saltos.
+
+Bypass Global
+-------------
+Nuevo: Botón de bypass global en la esquina superior derecha del header.
+
+- Al activar el bypass, el buffer de audio pasa limpio sin ningún procesamiento.
+- Un overlay negro semitransparente cubre toda la UI (excepto el header) con texto
+  "BYPASSED" centrado, y los controles quedan deshabilitados (no reciben clicks).
+- Al desactivar el bypass, se resetean los filtros IIR del splitter para evitar
+  artefactos/pops por estado stale (resetDSP).
+- El spectrum analyzer y vectorscope no se ejecutan cuando el plugin está bypassado,
+  ahorrando CPU y evitando gráficas congeladas.
+
+Archivos modificados:
+- Source/PluginProcessor.h
+- Source/PluginProcessor.cpp
+- Source/PluginEditor.h
+- Source/PluginEditor.cpp
+- Source/DSP/MultibandSplitter/MultibandSplitter.h
+- Source/DSP/MultibandSplitter/MultibandSplitter.cpp

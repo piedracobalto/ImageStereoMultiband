@@ -9,6 +9,17 @@ void MultibandSplitter::prepare(const juce::dsp::ProcessSpec& spec)
     }
 }
 
+void MultibandSplitter::reset()
+{
+    for (auto& xo : crossovers)
+    {
+        xo.lowL.reset();
+        xo.lowR.reset();
+        xo.highL.reset();
+        xo.highR.reset();
+    }
+}
+
 void MultibandSplitter::setFrequency(int index, float frequency)
 {
     frequencies[index] = frequency;

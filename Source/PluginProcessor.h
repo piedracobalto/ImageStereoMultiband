@@ -73,6 +73,7 @@ public:
     double getCurrentSampleRate() const { return currentSampleRate; }
     bool isBandMuted(int index) const { return index >= 0 && index < numBands ? bands[index].isMuted() : false; }
     bool isBandSoloed(int index) const { return index >= 0 && index < numBands ? bands[index].isSolo() : false; }
+    bool isBypassed() const;
 
     int getNumBands() const { return numBands; }
     bool canAddBand() const { return numBands < 5; }
@@ -97,6 +98,7 @@ private:
     int numBands = 2;
 
     void updateParameters();
+    void resetDSP();
 
     bool hasAnySolo() const;
     void applySoloLogic();
@@ -125,6 +127,8 @@ private:
     AudioAnalyzer analyzer;
     std::array<BandScopeBuffer, maxNumBands> bandScopes;
     double currentSampleRate = 44100.0;
+    juce::dsp::ProcessSpec lastSpec{};
+    bool wasBypassed = false;
 
     //==========================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ImageStereoMultibandAudioProcessor)

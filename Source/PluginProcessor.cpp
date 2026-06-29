@@ -90,6 +90,12 @@ ImageStereoMultibandAudioProcessor::createParameters()
                 defaultCrossovers[i]));
     }
 
+    params.push_back(
+        std::make_unique<juce::AudioParameterBool>(
+            "bypass",
+            "Bypass",
+            false));
+
     return { params.begin(), params.end() };
 }
 
@@ -183,10 +189,29 @@ void ImageStereoMultibandAudioProcessor::prepareToPlay(
 
     analyzer.prepare(sampleRate, samplesPerBlock);
     currentSampleRate = sampleRate;
+    lastSpec = spec;
 }
 
 void ImageStereoMultibandAudioProcessor::releaseResources()
 {
+}
+
+bool ImageStereoMultibandAudioProcessor::isBypassed() const
+{
+    return apvts.getRawParameterValue("bypass")->load() > 0.5f;
+}
+
+void ImageStereoMultibandAudioProcessor::resetDSP()
+{
+    splitter.reset();
+    analyzer.reset();
+    for (auto& buf : bandScopes)
+    {
+        buf.left.fill(0.0f);
+        buf.right.fill(0.0f);
+        buf.pos = 0;
+        buf.count = 0;
+    }
 }
 
 #ifndef JucePlugin_PreferredChannelConfigurations
@@ -232,6 +257,20 @@ void ImageStereoMultibandAudioProcessor::processBlock(
     juce::MidiBuffer&)
 {
     juce::ScopedNoDenormals noDenormals;
+
+    auto bypassed = apvts.getRawParameterValue("bypass")->load() > 0.5f;
+
+    if (bypassed)
+    {
+        wasBypassed = true;
+        return;
+    }
+
+    if (wasBypassed)
+    {
+        wasBypassed = false;
+        resetDSP();
+    }
 
     updateParameters();
 
